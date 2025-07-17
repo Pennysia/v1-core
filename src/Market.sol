@@ -373,12 +373,13 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             }
             amountOut -= feeAmountOut;
             amountIn[0] = amountOut; //chaining output as input for next swap
-            
-            _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
-            
-            (uint256 newBalance0, uint256 newBalance1) = zeroForOne ? (tokenBalances[token0] + amount, tokenBalances[token1] - amountOut) : (tokenBalances[token0] + amountOut, tokenBalances[token1] + amount);
-            _updateBalance(token0, token1, newBalance0, newBalance1);
 
+            _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
+
+            (uint256 newBalance0, uint256 newBalance1) = zeroForOne
+                ? (tokenBalances[token0] + amount, tokenBalances[token1] - amountOut)
+                : (tokenBalances[token0] + amountOut, tokenBalances[token1] + amount);
+            _updateBalance(token0, token1, newBalance0, newBalance1);
         }
 
         TransferHelper.safeTransfer(path[length - 1], to, amountOut);

@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {Market} from "../src/Market.sol";
-import {IMarket} from "../src/interfaces/IMarket.sol";  // Add this import for error selectors
+import {IMarket} from "../src/interfaces/IMarket.sol"; // Add this import for error selectors
 import {Validation} from "../src/libraries/Validation.sol";
-import {IERC20} from "../src/interfaces/IERC20.sol";  // For mocking token balances
+import {IERC20} from "../src/interfaces/IERC20.sol"; // For mocking token balances
 import {Math} from "../src/libraries/Math.sol"; // Added for Math.divUp
 import {Callback} from "../src/libraries/Callback.sol";
 import "../src/interfaces/ILiquidity.sol"; // Import the interface
@@ -32,8 +32,14 @@ contract MockERC20 is IERC20 {
     }
 
     // Minimal/unused implementations
-    function allowance(address, address) external pure override returns (uint256) { return 0; }
-    function approve(address, uint256) external pure override returns (bool) { return true; }
+    function allowance(address, address) external pure override returns (uint256) {
+        return 0;
+    }
+
+    function approve(address, uint256) external pure override returns (bool) {
+        return true;
+    }
+
     function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
         balanceOfMap[sender] -= amount;
         balanceOfMap[recipient] += amount;
@@ -44,9 +50,11 @@ contract MockERC20 is IERC20 {
 // Mock Callback for IPayment (for flash tests)
 contract MockCallback {
     Market public market;
+
     constructor(Market _market) {
         market = _market;
     }
+
     function requestToken(address _to, address[] memory tokens, uint256[] memory paybackAmounts) external {
         // Simulate payback: transfer back the required amounts
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -54,6 +62,7 @@ contract MockCallback {
         }
     }
     // Unused for flash
+
     function requestLiquidity(address, uint256, uint256, uint256, uint256, uint256) external {}
 }
 
@@ -61,12 +70,15 @@ contract MockCallback {
 contract MockLiquidityCallback {
     Market public market;
     address public lpOwner;
+
     constructor(Market _market) {
         market = _market;
     }
+
     function setLpOwner(address _lpOwner) external {
         lpOwner = _lpOwner;
     }
+
     function requestLiquidity(
         address to,
         uint256 pairId,
@@ -77,22 +89,33 @@ contract MockLiquidityCallback {
     ) external {
         // Check if lpOwner is set
         require(lpOwner != address(0), "lpOwner not set");
-        
+
         // The callback should call transferFrom on behalf of the lpOwner
         // The lpOwner should have approved this callback contract (not the Market)
         // because this callback is the one calling transferFrom
-        ILiquidity(address(market)).transferFrom(lpOwner, address(0), pairId, uint128(liquidity0Long), uint128(liquidity0Short), uint128(liquidity1Long), uint128(liquidity1Short));
+        ILiquidity(address(market)).transferFrom(
+            lpOwner,
+            address(0),
+            pairId,
+            uint128(liquidity0Long),
+            uint128(liquidity0Short),
+            uint128(liquidity1Long),
+            uint128(liquidity1Short)
+        );
     }
     // Unused for withdraw
+
     function requestToken(address, address[] memory, uint256[] memory) external {}
 }
 
 // Mock Callback for createLiquidity (implements requestToken by paying tokens)
 contract MockCreateLiquidityCallback {
     Market public market;
+
     constructor(Market _market) {
         market = _market;
     }
+
     function requestToken(address _to, address[] memory tokens, uint256[] memory amounts) external {
         // Pay tokens to the market
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -100,15 +123,18 @@ contract MockCreateLiquidityCallback {
         }
     }
     // Unused for create
+
     function requestLiquidity(address, uint256, uint256, uint256, uint256, uint256) external {}
 }
 
 // Mock Callback for swap (implements requestToken by paying tokens)
 contract MockSwapCallback {
     Market public market;
+
     constructor(Market _market) {
         market = _market;
     }
+
     function requestToken(address _to, address[] memory tokens, uint256[] memory amounts) external {
         // Pay tokens to the market
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -116,6 +142,7 @@ contract MockSwapCallback {
         }
     }
     // Unused for swap
+
     function requestLiquidity(address, uint256, uint256, uint256, uint256, uint256) external {}
 }
 
@@ -123,12 +150,15 @@ contract MockSwapCallback {
 contract InsufficientBurnCallback {
     Market public market;
     address public lpOwner;
+
     constructor(Market _market) {
         market = _market;
     }
+
     function setLpOwner(address _lpOwner) external {
         lpOwner = _lpOwner;
     }
+
     function requestLiquidity(
         address to,
         uint256 pairId,
@@ -142,21 +172,25 @@ contract InsufficientBurnCallback {
         market.transferFrom(lpOwner, address(0), pairId, 1, 1, 1, 1);
     }
     // Unused for withdraw
+
     function requestToken(address, address[] memory, uint256[] memory) external {}
 }
 
 // Mock Underpay Callback to test underpayment revert
 contract UnderpayCallback {
     Market public market;
+
     constructor(Market _market) {
         market = _market;
     }
+
     function requestToken(address _to, address[] memory tokens, uint256[] memory paybackAmounts) external {
         // Simulate underpayment: pay back less than required
         for (uint256 i = 0; i < tokens.length; i++) {
             MockERC20(tokens[i]).transfer(address(market), paybackAmounts[i] - 1);
         }
     }
+
     function requestLiquidity(address, uint256, uint256, uint256, uint256, uint256) external {}
 }
 
@@ -184,7 +218,7 @@ contract MarketTest is Test {
         assertEq(market.owner(), newOwner, "setOwner should update owner when called by current owner");
 
         // Failure case: Non-owner tries to call setOwner
-        vm.expectRevert(IMarket.forbidden.selector);  // Use IMarket for the error selector
+        vm.expectRevert(IMarket.forbidden.selector); // Use IMarket for the error selector
         vm.prank(nonOwner);
         market.setOwner(nonOwner);
     }
@@ -194,14 +228,14 @@ contract MarketTest is Test {
 
         // No event is emitted in the code, so we just call it to ensure no revert
         vm.prank(owner);
-        market.setOwner(newOwner);  // If you add an event later, test for it here
+        market.setOwner(newOwner); // If you add an event later, test for it here
     }
 
     // Tests for getPairId
     function test_GetPairIdComputesCorrectId() public view {
         address token0 = address(0xA);
         address token1 = address(0xB);
-        vm.assume(token0 < token1);  // Ensure sorted
+        vm.assume(token0 < token1); // Ensure sorted
 
         uint256 pairId = market.getPairId(token0, token1);
         uint256 expectedId = uint256(keccak256(abi.encodePacked(token0, token1)));
@@ -210,7 +244,7 @@ contract MarketTest is Test {
 
     function test_GetPairIdRevertsOnUnsortedTokens() public {
         address token0 = address(0xB);
-        address token1 = address(0xA);  // Unsorted: token0 > token1
+        address token1 = address(0xA); // Unsorted: token0 > token1
 
         vm.expectRevert(Validation.tokenError.selector);
         market.getPairId(token0, token1);
@@ -247,7 +281,7 @@ contract MarketTest is Test {
 
     function test_GetReservesRevertsOnUnsortedTokens() public {
         address token0 = address(0xB);
-        address token1 = address(0xA);  // Unsorted
+        address token1 = address(0xA); // Unsorted
 
         vm.expectRevert(Validation.tokenError.selector);
         market.getReserves(token0, token1);
@@ -264,7 +298,7 @@ contract MarketTest is Test {
         // Correct slot for tokenBalances: slot 6 (after inherited slots from Liquidity: 0-3, owner:4, pairs:5)
         bytes32 mappingSlot = bytes32(uint256(6));
         bytes32 storageSlot = keccak256(abi.encode(token, mappingSlot));
-        vm.store(address(market), storageSlot, bytes32(uint256(600)));  // tracked tokenBalances[token] = 600
+        vm.store(address(market), storageSlot, bytes32(uint256(600))); // tracked tokenBalances[token] = 600
 
         uint256 sweepable = market.getSweepable(token);
         assertEq(sweepable, 400, "getSweepable should return balance - tracked balance");
@@ -335,7 +369,7 @@ contract MarketTest is Test {
         address[] memory tokens = new address[](1);
         tokens[0] = token;
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 60;  // > 50
+        amounts[0] = 60; // > 50
         address[] memory to = new address[](1);
         to[0] = address(0xABC);
 
@@ -346,7 +380,7 @@ contract MarketTest is Test {
 
     function test_SweepRevertsOnLengthMismatches() public {
         address[] memory tokens = new address[](2);
-        uint256[] memory amounts = new uint256[](1);  // Mismatch
+        uint256[] memory amounts = new uint256[](1); // Mismatch
         address[] memory to = new address[](2);
 
         vm.expectRevert(Validation.lengthError.selector);
@@ -371,19 +405,21 @@ contract MarketTest is Test {
         to[0] = address(0xABC);
 
         vm.prank(owner);
-        market.sweep(tokens, amounts, to);  // Should not revert, even if zero
+        market.sweep(tokens, amounts, to); // Should not revert, even if zero
     }
 
     function test_SweepEdgeMaxUint() public {
         address token = address(new MockERC20());
         MockERC20 mockToken = MockERC20(token);
         mockToken.setBalance(address(market), type(uint256).max);
-        vm.store(address(market), keccak256(abi.encode(token, uint256(keccak256("tokenBalances")))), bytes32(uint256(1)));
+        vm.store(
+            address(market), keccak256(abi.encode(token, uint256(keccak256("tokenBalances")))), bytes32(uint256(1))
+        );
 
         address[] memory tokens = new address[](1);
         tokens[0] = token;
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = type(uint256).max - 1;  // <= sweepable
+        amounts[0] = type(uint256).max - 1; // <= sweepable
         address[] memory to = new address[](1);
         to[0] = address(0xABC);
 
@@ -395,7 +431,7 @@ contract MarketTest is Test {
     function test_FlashSingleToken() public {
         address token = address(new MockERC20());
         MockERC20 mockToken = MockERC20(token);
-        mockToken.setBalance(address(market), 1000);  // Market has tokens to flash
+        mockToken.setBalance(address(market), 1000); // Market has tokens to flash
 
         MockCallback callback = new MockCallback(market);
         address to = address(0xDEF);
@@ -404,8 +440,8 @@ contract MarketTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 500;
 
-        uint256 expectedFee = Math.divUp(500, 1000);  // 1
-        uint256 expectedPayback = 500 + expectedFee;  // 501
+        uint256 expectedFee = Math.divUp(500, 1000); // 1
+        uint256 expectedPayback = 500 + expectedFee; // 501
 
         // Set callback balance for payback
         mockToken.setBalance(address(callback), expectedPayback);
@@ -433,8 +469,8 @@ contract MarketTest is Test {
         amounts[0] = 300;
         amounts[1] = 600;
 
-        uint256 fee1 = Math.divUp(300, 1000);  // 1
-        uint256 fee2 = Math.divUp(600, 1000);  // 1
+        uint256 fee1 = Math.divUp(300, 1000); // 1
+        uint256 fee2 = Math.divUp(600, 1000); // 1
 
         // Set callback balances for payback
         mockToken1.setBalance(address(callback), 300 + fee1);
@@ -452,7 +488,7 @@ contract MarketTest is Test {
         address token = address(new MockERC20());
         MockERC20 mockToken = MockERC20(token);
         mockToken.setBalance(address(market), 1000);
-        
+
         address[] memory tokens = new address[](1);
         tokens[0] = token;
         uint256[] memory amounts = new uint256[](1);
@@ -476,7 +512,7 @@ contract MarketTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 500;
 
-        uint256 expectedPayback = 500 + Math.divUp(500, 1000);  // 501
+        uint256 expectedPayback = 500 + Math.divUp(500, 1000); // 501
 
         mockToken.setBalance(address(callback), expectedPayback);
 
@@ -542,9 +578,8 @@ contract MarketTest is Test {
         emit IMarket.Mint(address(callback), to, pairId, 2000, 2000);
 
         vm.prank(address(callback));
-        (uint256 returnedPairId, uint256 liq0L, uint256 liq0S, uint256 liq1L, uint256 liq1S) = market.createLiquidity(
-            to, token0, token1, amount0Long, amount0Short, amount1Long, amount1Short
-        );
+        (uint256 returnedPairId, uint256 liq0L, uint256 liq0S, uint256 liq1L, uint256 liq1S) =
+            market.createLiquidity(to, token0, token1, amount0Long, amount0Short, amount1Long, amount1Short);
 
         assertEq(returnedPairId, pairId, "Pair ID should be computed");
         assertEq(liq0L, 1000000, "Initial LP mint for long0");
@@ -592,9 +627,8 @@ contract MarketTest is Test {
         emit IMarket.Mint(address(callback), to, pairId, add0L + add0S, add1L + add1S);
 
         vm.prank(address(callback));
-        (, uint256 liq0L, uint256 liq0S, uint256 liq1L, uint256 liq1S) = market.createLiquidity(
-            to, token0, token1, add0L, add0S, add1L, add1S
-        );
+        (, uint256 liq0L, uint256 liq0S, uint256 liq1L, uint256 liq1S) =
+            market.createLiquidity(to, token0, token1, add0L, add0S, add1L, add1S);
 
         // Proportional LP: reserves were 1000, totalLP 1M, adding 2000 -> LP = (2000 / 1000) * 1M = 2M (but code uses fullMulDiv(amount, totalLP, reserve))
         assertEq(liq0L, 2000000, "Proportional LP for long0");
@@ -605,7 +639,7 @@ contract MarketTest is Test {
         MockCreateLiquidityCallback callback = new MockCreateLiquidityCallback(market);
         address to = address(0xDEF);
         address token0 = address(0xB);
-        address token1 = address(0xA);  // Unsorted
+        address token1 = address(0xA); // Unsorted
 
         vm.expectRevert(Validation.tokenError.selector);
         vm.prank(address(callback));
@@ -677,7 +711,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -689,9 +723,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback to burn LP from this contract
         liquidityCallback.setLpOwner(address(this));
@@ -702,14 +735,13 @@ contract MarketTest is Test {
         uint256 withdraw = 500000;
 
         vm.prank(address(liquidityCallback));
-        (, uint256 retAmount0, uint256 retAmount1) = market.withdrawLiquidity(
-            to, token0, token1, withdraw, withdraw, withdraw, withdraw
-        );
+        (, uint256 retAmount0, uint256 retAmount1) =
+            market.withdrawLiquidity(to, token0, token1, withdraw, withdraw, withdraw, withdraw);
 
         // Just verify positive amounts were returned
         assertTrue(retAmount0 > 0, "Amount0 should be > 0");
         assertTrue(retAmount1 > 0, "Amount1 should be > 0");
-        
+
         // Verify they are equal (symmetric)
         assertEq(retAmount0, retAmount1, "Amount0 should equal Amount1");
 
@@ -760,7 +792,7 @@ contract MarketTest is Test {
         InsufficientBurnCallback liquidityCallback = new InsufficientBurnCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -770,7 +802,7 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), 2000);
         mockToken1.setBalance(address(tokenCallback), 2000);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(address(this), token0, token1, 1000, 1000, 1000, 1000);
+        (uint256 pairId,,,,) = market.createLiquidity(address(this), token0, token1, 1000, 1000, 1000, 1000);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
@@ -788,7 +820,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -799,9 +831,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
@@ -828,7 +859,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -839,16 +870,15 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
         market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
 
         vm.prank(address(liquidityCallback));
-        (, uint256 amount0, uint256 amount1) = market.withdrawLiquidity(
-            to, token0, token1, 0, 0, 0, 0
-        );
+        (, uint256 amount0, uint256 amount1) = market.withdrawLiquidity(to, token0, token1, 0, 0, 0, 0);
 
         assertEq(amount0, 0, "Amount0 zero");
         assertEq(amount1, 0, "Amount1 zero");
@@ -865,7 +895,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -876,7 +906,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
@@ -895,7 +926,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -906,7 +937,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
@@ -932,7 +964,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -947,7 +979,8 @@ contract MarketTest is Test {
         market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Check reserves before swap
-        (uint128 r0L_before, uint128 r0S_before, uint128 r1L_before, uint128 r1S_before) = market.getReserves(token0, token1);
+        (uint128 r0L_before, uint128 r0S_before, uint128 r1L_before, uint128 r1S_before) =
+            market.getReserves(token0, token1);
         console.log("=== Before swap ===");
         console.log("Reserve0 (Long + Short):", r0L_before + r0S_before);
         console.log("Reserve1 (Long + Short):", r1L_before + r1S_before);
@@ -970,7 +1003,7 @@ contract MarketTest is Test {
         console.log("Recipient token1 balance before:", mockToken1.balanceOf(to));
 
         uint256 initialBalance1 = mockToken1.balanceOf(to);
-        
+
         vm.prank(address(swapCallback));
         uint256 amountOut = market.swap(to, path, swapAmount);
 
@@ -984,14 +1017,14 @@ contract MarketTest is Test {
 
         assertTrue(amountOut > 0, "Should receive some token1");
         assertEq(mockToken1.balanceOf(to), initialBalance1 + amountOut, "Recipient should receive tokens");
-        
+
         // Check reserves updated
         (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
         console.log("Reserve0 after (Long + Short):", r0L + r0S);
         console.log("Reserve1 after (Long + Short):", r1L + r1S);
         console.log("Reserve0 change:", int256(uint256(r0L + r0S)) - int256(uint256(r0L_before + r0S_before)));
         console.log("Reserve1 change:", int256(uint256(r1L + r1S)) - int256(uint256(r1L_before + r1S_before)));
-        
+
         // Based on the actual behavior: when path = [token0, token1]
         // We pay token0, but token1 reserves increase and token0 reserves decrease
         // This suggests we're actually swapping token1 for token0 due to the direction logic
@@ -1006,12 +1039,12 @@ contract MarketTest is Test {
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
         MockERC20 mockTokenC = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
         address token2 = address(mockTokenC);
-        
+
         // Sort token2 relative to others
         if (token2 < token0) {
             address temp = token0;
@@ -1051,7 +1084,7 @@ contract MarketTest is Test {
         path[2] = token2;
 
         uint256 initialBalance2 = mockToken2.balanceOf(to);
-        
+
         vm.prank(address(swapCallback));
         uint256 amountOut = market.swap(to, path, swapAmount);
 
@@ -1118,14 +1151,14 @@ contract MarketTest is Test {
         // Use proper mock tokens to avoid precompile address issues
         address token0 = address(new MockERC20());
         address token1 = address(new MockERC20());
-        
+
         // Ensure proper ordering for validation to pass token sorting check
         if (token0 > token1) {
             address temp = token0;
             token0 = token1;
             token1 = temp;
         }
-        
+
         MockERC20 mockToken0 = MockERC20(token0);
         mockToken0.setBalance(address(market), 1000);
 
@@ -1142,13 +1175,13 @@ contract MarketTest is Test {
     function test_SwapFuzz(uint256 swapAmount) public {
         // Ensure amount is large enough to produce meaningful output after fees
         vm.assume(swapAmount > 1000 && swapAmount < type(uint128).max / 1000);
-        
+
         MockCreateLiquidityCallback tokenCallback = new MockCreateLiquidityCallback(market);
         MockSwapCallback swapCallback = new MockSwapCallback(market);
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1184,7 +1217,7 @@ contract MarketTest is Test {
         MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1196,9 +1229,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Check LP balance
         ILiquidity.LpInfo memory balance = market.balanceOf(address(this), pairId);
@@ -1206,7 +1238,7 @@ contract MarketTest is Test {
         console.log("LP Balance - shortX:", balance.shortX);
         console.log("LP Balance - longY:", balance.longY);
         console.log("LP Balance - shortY:", balance.shortY);
-        
+
         // Check total supply
         ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
         console.log("Total Supply - longX:", totalSupply.longX);
@@ -1217,7 +1249,7 @@ contract MarketTest is Test {
         // Set up approval
         liquidityCallback.setLpOwner(address(this));
         market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
-        
+
         // Check allowance
         uint256 allowanceValue = market.allowance(address(this), address(liquidityCallback), pairId);
         console.log("Allowance:", allowanceValue);
@@ -1230,7 +1262,7 @@ contract MarketTest is Test {
         console.log("Available shortX:", balance.shortX);
         console.log("Available longY:", balance.longY);
         console.log("Available shortY:", balance.shortY);
-        
+
         // Try to transfer small amount using transfer (not transferFrom)
         try market.transfer(address(0), pairId, 1, 1, 1, 1) {
             console.log("Transfer successful");
@@ -1239,7 +1271,7 @@ contract MarketTest is Test {
         } catch (bytes memory) {
             console.log("Transfer failed with low-level error");
         }
-        
+
         // Try to transfer small amount using transferFrom
         try market.transferFrom(address(this), address(0), pairId, 1, 1, 1, 1) {
             console.log("TransferFrom successful");
@@ -1255,7 +1287,7 @@ contract MarketTest is Test {
         MockCreateLiquidityCallback tokenCallback = new MockCreateLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1267,9 +1299,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Approve a spender (use another address)
         address spender = address(0x123);
@@ -1301,7 +1332,7 @@ contract MarketTest is Test {
         MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1313,38 +1344,37 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
-        
+
         // Check current time
         console.log("Current block timestamp:", block.timestamp);
-        
+
         // Set approval for callback
         uint256 approvalTime = block.timestamp + 3600;
         console.log("Setting approval to:", approvalTime);
         market.approve(address(liquidityCallback), pairId, approvalTime);
-        
+
         // Check allowance for callback
         uint256 allowanceValue = market.allowance(address(this), address(liquidityCallback), pairId);
         console.log("Allowance value for callback:", allowanceValue);
-        
+
         // Check allowance for self (test contract)
         uint256 selfAllowanceValue = market.allowance(address(this), address(this), pairId);
         console.log("Self allowance value:", selfAllowanceValue);
-        
+
         // Set self-approval for direct transferFrom test
         market.approve(address(this), pairId, approvalTime);
         uint256 selfAllowanceAfter = market.allowance(address(this), address(this), pairId);
         console.log("Self allowance after approval:", selfAllowanceAfter);
-        
+
         // Check balance
         ILiquidity.LpInfo memory balance = market.balanceOf(address(this), pairId);
         console.log("Balance longX:", balance.longX);
-        
+
         // Try direct transferFrom call (should work now)
         try market.transferFrom(address(this), address(0), pairId, 1, 1, 1, 1) {
             console.log("Direct transferFrom successful");
@@ -1353,7 +1383,7 @@ contract MarketTest is Test {
         } catch (bytes memory) {
             console.log("Direct transferFrom failed with low-level error");
         }
-        
+
         // Try via callback
         try liquidityCallback.requestLiquidity(address(0xDEF), pairId, 1, 1, 1, 1) {
             console.log("Callback requestLiquidity successful");
@@ -1377,7 +1407,7 @@ contract MarketTest is Test {
         MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1389,9 +1419,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         console.log("Created liquidity successfully");
         console.log("PairId:", pairId);
@@ -1399,7 +1428,7 @@ contract MarketTest is Test {
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
         market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
-        
+
         console.log("Set up callback and approval");
 
         // Check pair exists
@@ -1408,49 +1437,47 @@ contract MarketTest is Test {
         console.log("Reserves - r0S:", r0S);
         console.log("Reserves - r1L:", r1L);
         console.log("Reserves - r1S:", r1S);
-        
+
         // Check if pairs[pairId].reserve0Long > 0
         assertTrue(r0L > 0, "Reserve0Long should be > 0");
-        
+
         // Test individual components
         console.log("Testing validation checks...");
-        
+
         // Test Validation.notThis(to)
         address to = address(0xDEF);
         console.log("to address:", to);
         console.log("market address:", address(market));
         assertTrue(to != address(market), "to should not be market");
-        
+
         // Test Validation.checkTokenOrder
         console.log("token0:", token0);
         console.log("token1:", token1);
         assertTrue(token0 < token1, "tokens should be ordered");
-        
+
         // Test SafeCast
         uint256 liquidity = 500000;
         uint128 liquidityCast = SafeCast.safe128(liquidity);
         console.log("SafeCast result:", liquidityCast);
-        
+
         console.log("All checks passed, now trying withdrawLiquidity...");
-        
+
         // Check LP balance and total supply before withdrawal
         ILiquidity.LpInfo memory userBalance = market.balanceOf(address(this), pairId);
         console.log("User LP balance - longX:", userBalance.longX);
         console.log("User LP balance - shortX:", userBalance.shortX);
         console.log("User LP balance - longY:", userBalance.longY);
         console.log("User LP balance - shortY:", userBalance.shortY);
-        
+
         ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
         console.log("Total supply - longX:", totalSupply.longX);
         console.log("Total supply - shortX:", totalSupply.shortX);
         console.log("Total supply - longY:", totalSupply.longY);
         console.log("Total supply - shortY:", totalSupply.shortY);
-        
+
         // Try the actual call
         vm.prank(address(liquidityCallback));
-        try market.withdrawLiquidity(
-            to, token0, token1, liquidity, liquidity, liquidity, liquidity
-        ) {
+        try market.withdrawLiquidity(to, token0, token1, liquidity, liquidity, liquidity, liquidity) {
             console.log("withdrawLiquidity succeeded");
         } catch Error(string memory reason) {
             console.log("withdrawLiquidity failed with reason:", reason);
@@ -1464,7 +1491,7 @@ contract MarketTest is Test {
         MockCreateLiquidityCallback tokenCallback = new MockCreateLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1476,30 +1503,31 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Check initial state
         ILiquidity.LpInfo memory balanceBefore = market.balanceOf(address(this), pairId);
         ILiquidity.LpInfo memory totalSupplyBefore = market.totalSupply(pairId);
-        
+
         console.log("Before burn:");
         console.log("User balance longX:", balanceBefore.longX);
         console.log("Total supply longX:", totalSupplyBefore.longX);
-        
+
         // Try to burn directly using transfer to address(0)
         uint256 burnAmount = 100000;
-        market.transfer(address(0), pairId, uint128(burnAmount), uint128(burnAmount), uint128(burnAmount), uint128(burnAmount));
-        
+        market.transfer(
+            address(0), pairId, uint128(burnAmount), uint128(burnAmount), uint128(burnAmount), uint128(burnAmount)
+        );
+
         // Check after burn
         ILiquidity.LpInfo memory balanceAfter = market.balanceOf(address(this), pairId);
         ILiquidity.LpInfo memory totalSupplyAfter = market.totalSupply(pairId);
-        
+
         console.log("After burn:");
         console.log("User balance longX:", balanceAfter.longX);
         console.log("Total supply longX:", totalSupplyAfter.longX);
-        
+
         // Verify the burn worked
         assertEq(balanceAfter.longX, balanceBefore.longX - burnAmount, "User balance should decrease");
         assertEq(totalSupplyAfter.longX, totalSupplyBefore.longX - burnAmount, "Total supply should decrease");
@@ -1511,7 +1539,7 @@ contract MarketTest is Test {
         MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1523,14 +1551,13 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
         market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
-        
+
         // Test the callback directly
         try liquidityCallback.requestLiquidity(address(0xDEF), pairId, 1, 1, 1, 1) {
             console.log("Direct callback succeeded");
@@ -1547,7 +1574,7 @@ contract MarketTest is Test {
         MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1559,9 +1586,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         console.log("=== After createLiquidity ===");
         ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
@@ -1579,39 +1605,36 @@ contract MarketTest is Test {
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
         market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
-        
+
         console.log("=== Setup complete ===");
-        
+
         // Test direct callback first
         console.log("=== Testing direct callback ===");
         try liquidityCallback.requestLiquidity(address(0xDEF), pairId, 1, 1, 1, 1) {
             console.log("Direct callback succeeded");
-            
+
             ILiquidity.LpInfo memory totalSupplyAfter = market.totalSupply(pairId);
             console.log("Total supply after direct callback longX:", totalSupplyAfter.longX);
             console.log("Total supply after direct callback shortX:", totalSupplyAfter.shortX);
             console.log("Total supply after direct callback longY:", totalSupplyAfter.longY);
             console.log("Total supply after direct callback shortY:", totalSupplyAfter.shortY);
-            
+
             ILiquidity.LpInfo memory userBalanceAfter = market.balanceOf(address(this), pairId);
             console.log("User balance after direct callback longX:", userBalanceAfter.longX);
             console.log("User balance after direct callback shortX:", userBalanceAfter.shortX);
             console.log("User balance after direct callback longY:", userBalanceAfter.longY);
             console.log("User balance after direct callback shortY:", userBalanceAfter.shortY);
-            
         } catch Error(string memory reason) {
             console.log("Direct callback failed with reason:", reason);
         } catch (bytes memory) {
             console.log("Direct callback failed with low-level error");
         }
-        
+
         console.log("=== Testing withdrawLiquidity ===");
-        
+
         // Now try withdrawLiquidity with same amounts
         vm.prank(address(liquidityCallback));
-        try market.withdrawLiquidity(
-            address(0xDEF), token0, token1, 1, 1, 1, 1
-        ) {
+        try market.withdrawLiquidity(address(0xDEF), token0, token1, 1, 1, 1, 1) {
             console.log("withdrawLiquidity succeeded");
         } catch Error(string memory reason) {
             console.log("withdrawLiquidity failed with reason:", reason);
@@ -1627,7 +1650,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1639,9 +1662,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId, uint256 l0L, uint256 l0S, uint256 l1L, uint256 l1S) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         console.log("=== Initial state ===");
         ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
@@ -1666,11 +1688,10 @@ contract MarketTest is Test {
 
         console.log("=== Attempting withdrawLiquidity ===");
         console.log("Withdraw amount:", withdraw);
-        
+
         vm.prank(address(liquidityCallback));
-        (, uint256 retAmount0, uint256 retAmount1) = market.withdrawLiquidity(
-            to, token0, token1, withdraw, withdraw, withdraw, withdraw
-        );
+        (, uint256 retAmount0, uint256 retAmount1) =
+            market.withdrawLiquidity(to, token0, token1, withdraw, withdraw, withdraw, withdraw);
 
         console.log("=== After withdrawLiquidity ===");
         console.log("Amount0 returned:", retAmount0);
@@ -1687,7 +1708,7 @@ contract MarketTest is Test {
         MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1699,32 +1720,31 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         liquidityCallback.setLpOwner(address(this));
-        
+
         console.log("Current block timestamp:", block.timestamp);
-        
+
         // Check allowance before approval
         uint256 allowanceBefore = market.allowance(address(this), address(liquidityCallback), pairId);
         console.log("Allowance before approval:", allowanceBefore);
-        
+
         // Set approval
         uint256 approvalTime = block.timestamp + 3600;
         console.log("Setting approval to:", approvalTime);
         market.approve(address(liquidityCallback), pairId, approvalTime);
-        
+
         // Check allowance after approval
         uint256 allowanceAfter = market.allowance(address(this), address(liquidityCallback), pairId);
         console.log("Allowance after approval:", allowanceAfter);
         console.log("Is allowance >= block.timestamp?", allowanceAfter >= block.timestamp);
-        
+
         // Check balance
         ILiquidity.LpInfo memory balance = market.balanceOf(address(this), pairId);
         console.log("User balance longX:", balance.longX);
-        
+
         // Try direct transferFrom call with smallest amounts
         console.log("Attempting direct transferFrom...");
         try market.transferFrom(address(this), address(0), pairId, 1, 1, 1, 1) {
@@ -1735,7 +1755,7 @@ contract MarketTest is Test {
             console.log("Direct transferFrom failed with low-level error");
             console.logBytes(lowLevelData);
         }
-        
+
         // Try callback call
         console.log("Attempting callback call...");
         try liquidityCallback.requestLiquidity(address(0xDEF), pairId, 1, 1, 1, 1) {
@@ -1755,7 +1775,7 @@ contract MarketTest is Test {
         address to = address(0xDEF);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1767,9 +1787,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Set up callback to burn LP from this contract
         liquidityCallback.setLpOwner(address(this));
@@ -1781,11 +1800,10 @@ contract MarketTest is Test {
 
         console.log("=== Attempting small withdrawLiquidity ===");
         console.log("Withdraw amount:", withdraw);
-        
+
         vm.prank(address(liquidityCallback));
-        (, uint256 retAmount0, uint256 retAmount1) = market.withdrawLiquidity(
-            to, token0, token1, withdraw, withdraw, withdraw, withdraw
-        );
+        (, uint256 retAmount0, uint256 retAmount1) =
+            market.withdrawLiquidity(to, token0, token1, withdraw, withdraw, withdraw, withdraw);
 
         console.log("=== After small withdrawLiquidity ===");
         console.log("Amount0 returned:", retAmount0);
@@ -1794,7 +1812,7 @@ contract MarketTest is Test {
         // Just verify amounts were returned (could be 0 due to fees for small amounts)
         assertTrue(retAmount0 >= 0, "Amount0 should be >= 0");
         assertTrue(retAmount1 >= 0, "Amount1 should be >= 0");
-        
+
         // Verify the withdrawal actually happened (total supply should decrease)
         ILiquidity.LpInfo memory totalSupplyAfter = market.totalSupply(pairId);
         assertEq(totalSupplyAfter.longX, 2000000 - withdraw, "Total supply should decrease by withdraw amount");
@@ -1806,7 +1824,7 @@ contract MarketTest is Test {
         MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
         MockERC20 mockTokenA = new MockERC20();
         MockERC20 mockTokenB = new MockERC20();
-        
+
         // Ensure proper token ordering
         address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
         address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
@@ -1818,9 +1836,8 @@ contract MarketTest is Test {
         mockToken0.setBalance(address(tokenCallback), initAmount * 2);
         mockToken1.setBalance(address(tokenCallback), initAmount * 2);
         vm.prank(address(tokenCallback));
-        (uint256 pairId, , , , ) = market.createLiquidity(
-            address(this), token0, token1, initAmount, initAmount, initAmount, initAmount
-        );
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Check balances and allowances before attempting transferFrom
         ILiquidity.LpInfo memory userBalance = market.balanceOf(address(this), pairId);
@@ -1828,23 +1845,30 @@ contract MarketTest is Test {
         console.log("User balance shortX:", userBalance.shortX);
         console.log("User balance longY:", userBalance.longY);
         console.log("User balance shortY:", userBalance.shortY);
-        
+
         // Set up approval
         liquidityCallback.setLpOwner(address(this));
         market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
-        
+
         // Check allowance
         uint256 allowanceValue = market.allowance(address(this), address(liquidityCallback), pairId);
         console.log("Allowance value:", allowanceValue);
         console.log("Block timestamp:", block.timestamp);
         console.log("Is allowance >= timestamp?", allowanceValue >= block.timestamp);
-        
+
         // Try direct transferFrom with the exact values that the callback would use
         uint256 transferAmount = 500000;
         console.log("Attempting direct transferFrom with amount:", transferAmount);
-        
-        try market.transferFrom(address(this), address(0), pairId, 
-            uint128(transferAmount), uint128(transferAmount), uint128(transferAmount), uint128(transferAmount)) {
+
+        try market.transferFrom(
+            address(this),
+            address(0),
+            pairId,
+            uint128(transferAmount),
+            uint128(transferAmount),
+            uint128(transferAmount),
+            uint128(transferAmount)
+        ) {
             console.log("Direct transferFrom succeeded");
         } catch Error(string memory reason) {
             console.log("Direct transferFrom failed with reason:", reason);
@@ -1856,11 +1880,18 @@ contract MarketTest is Test {
                 console.logBytes4(selector);
             }
         }
-        
+
         // Also try with msg.sender = liquidityCallback
         vm.prank(address(liquidityCallback));
-        try market.transferFrom(address(this), address(0), pairId, 
-            uint128(transferAmount), uint128(transferAmount), uint128(transferAmount), uint128(transferAmount)) {
+        try market.transferFrom(
+            address(this),
+            address(0),
+            pairId,
+            uint128(transferAmount),
+            uint128(transferAmount),
+            uint128(transferAmount),
+            uint128(transferAmount)
+        ) {
             console.log("Callback transferFrom succeeded");
         } catch Error(string memory reason) {
             console.log("Callback transferFrom failed with reason:", reason);

@@ -9,7 +9,7 @@ contract ValidationTest is Test {
     function test_CheckTokenOrderSuccess() public pure {
         address token0 = address(0x1);
         address token1 = address(0x2);
-        
+
         // Should not revert when token0 < token1
         Validation.checkTokenOrder(token0, token1);
     }
@@ -17,7 +17,7 @@ contract ValidationTest is Test {
     function test_CheckTokenOrderRevertsOnUnsorted() public {
         address token0 = address(0x2);
         address token1 = address(0x1);
-        
+
         bool reverted = false;
         try this.callCheckTokenOrder(token0, token1) {
             // Should not reach here
@@ -29,7 +29,7 @@ contract ValidationTest is Test {
 
     function test_CheckTokenOrderRevertsOnEqual() public {
         address token = address(0x1);
-        
+
         bool reverted = false;
         try this.callCheckTokenOrder(token, token) {
             // Should not reach here
@@ -173,16 +173,16 @@ contract ValidationTest is Test {
     function test_ValidationEdgeCases() public view {
         // Test with zero addresses
         Validation.checkTokenOrder(address(0), address(1));
-        
+
         // Test with max addresses
         Validation.checkTokenOrder(address(0), address(type(uint160).max));
-        
+
         // Test notThis with zero address
         Validation.notThis(address(0));
-        
+
         // Test equalLengths with large numbers
         Validation.equalLengths(type(uint256).max, type(uint256).max);
-        
+
         // Test notZero with max value
         Validation.notZero(type(uint256).max);
     }
@@ -191,12 +191,12 @@ contract ValidationTest is Test {
         // Test multiple validations in sequence
         address token0 = address(0x1);
         address token1 = address(0x2);
-        
+
         Validation.checkTokenOrder(token0, token1);
         Validation.equalLengths(5, 5);
         Validation.notThis(token0);
         Validation.notZero(100);
-        
+
         // All should pass without reverting
     }
-} 
+}

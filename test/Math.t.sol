@@ -30,7 +30,7 @@ contract MathTest is Test {
         }
         assertTrue(reverted, "fullMulDiv should revert on zero denominator");
     }
-    
+
     function callFullMulDiv(uint256 x, uint256 y, uint256 d) external pure returns (uint256) {
         return Math.fullMulDiv(x, y, d);
     }
@@ -50,7 +50,7 @@ contract MathTest is Test {
         vm.assume(d > 0);
         vm.assume(x <= type(uint128).max);
         vm.assume(y <= type(uint128).max);
-        
+
         uint256 result = Math.fullMulDiv(x, y, d);
         // Basic property: result should be approximately x * y / d
         // For bounded inputs, this should not overflow
@@ -68,7 +68,7 @@ contract MathTest is Test {
         uint256 normalResult = Math.fullMulDiv(100, 200, 51);
         // fullMulDivUp should be >= fullMulDiv
         assertTrue(result >= normalResult, "fullMulDivUp should be >= fullMulDiv");
-        
+
         // For this specific case, 100 * 200 / 51 = 20000 / 51 = 392.15..., so up should be 393
         assertTrue(result >= 392, "fullMulDivUp should round up from 392.15");
     }
@@ -82,7 +82,7 @@ contract MathTest is Test {
         }
         assertTrue(reverted, "fullMulDivUp should revert on zero denominator");
     }
-    
+
     function callFullMulDivUp(uint256 x, uint256 y, uint256 d) external pure returns (uint256) {
         return Math.fullMulDivUp(x, y, d);
     }
@@ -91,10 +91,10 @@ contract MathTest is Test {
         vm.assume(d > 0);
         vm.assume(x <= type(uint128).max);
         vm.assume(y <= type(uint128).max);
-        
+
         uint256 result = Math.fullMulDivUp(x, y, d);
         uint256 normalResult = Math.fullMulDiv(x, y, d);
-        
+
         // fullMulDivUp should always be >= fullMulDiv
         assertTrue(result >= normalResult, "fullMulDivUp should be >= fullMulDiv");
     }
@@ -108,13 +108,13 @@ contract MathTest is Test {
     function test_DivUpRoundsUp() public pure {
         uint256 result = Math.divUp(100, 51);
         assertEq(result, 2, "divUp should round up 100 / 51 = 2");
-        
+
         result = Math.divUp(101, 51);
         assertEq(result, 2, "divUp should round up 101 / 51 = 2");
-        
+
         result = Math.divUp(102, 51);
         assertEq(result, 2, "divUp should round up 102 / 51 = 2");
-        
+
         result = Math.divUp(103, 51);
         assertEq(result, 3, "divUp should round up 103 / 51 = 3");
     }
@@ -128,7 +128,7 @@ contract MathTest is Test {
         }
         assertTrue(reverted, "divUp should revert on zero denominator");
     }
-    
+
     function callDivUp(uint256 x, uint256 d) external pure returns (uint256) {
         return Math.divUp(x, d);
     }
@@ -136,13 +136,13 @@ contract MathTest is Test {
     function test_DivUpFuzz(uint256 x, uint256 d) public pure {
         vm.assume(d > 0);
         vm.assume(x < type(uint256).max - d); // Avoid overflow in ceiling calculation
-        
+
         uint256 result = Math.divUp(x, d);
         uint256 normalResult = x / d;
-        
+
         // divUp should always be >= normal division
         assertTrue(result >= normalResult, "divUp should be >= normal division");
-        
+
         // divUp should be at most normalResult + 1
         assertTrue(result <= normalResult + 1, "divUp should be at most normalResult + 1");
     }
@@ -178,7 +178,7 @@ contract MathTest is Test {
         uint256 largeNum = 1000000; // 10^6
         uint256 result = Math.cbrt(largeNum);
         assertEq(result, 100, "cbrt(1000000) should be 100");
-        
+
         // Test with very large number
         largeNum = type(uint64).max;
         result = Math.cbrt(largeNum);
@@ -189,15 +189,16 @@ contract MathTest is Test {
     function test_CbrtFuzz(uint256 x) public pure {
         vm.assume(x <= type(uint64).max); // Limit to avoid overflow in verification
         vm.assume(x > 0); // Avoid division by zero issues
-        
+
         uint256 result = Math.cbrt(x);
-        
+
         // Property: result^3 <= x < (result+1)^3
         if (result > 0) {
             assertTrue(result * result * result <= x, "result^3 should be <= x");
         }
-        
-        if (result < type(uint64).max / result / result) { // Avoid overflow
+
+        if (result < type(uint64).max / result / result) {
+            // Avoid overflow
             uint256 nextCube = (result + 1) * (result + 1) * (result + 1);
             assertTrue(x < nextCube, "x should be < (result+1)^3");
         }
@@ -215,7 +216,7 @@ contract MathTest is Test {
     function test_CbrtEdgeCases() public pure {
         // Test edge cases
         assertEq(Math.cbrt(type(uint256).max), Math.cbrt(type(uint256).max), "cbrt should handle max uint256");
-        
+
         // Test powers of 2
         assertEq(Math.cbrt(2), 1, "cbrt(2) should be 1");
         assertEq(Math.cbrt(4), 1, "cbrt(4) should be 1");
@@ -224,4 +225,4 @@ contract MathTest is Test {
         assertEq(Math.cbrt(128), 5, "cbrt(128) should be 5");
         assertEq(Math.cbrt(256), 6, "cbrt(256) should be 6");
     }
-} 
+}

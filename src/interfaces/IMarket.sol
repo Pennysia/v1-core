@@ -23,5 +23,12 @@ interface IMarket {
     event Burn(address indexed sender, address indexed to, uint256 indexed pairId, uint256 amount0, uint256 amount1);
     event Sweep(address indexed sender, address[] to, address[] tokens, uint256[] amounts);
     event Flash(address indexed sender, address to, address[] tokens, uint256[] amounts, uint256[] paybackAmounts);
-    event Swap(address indexed sender, address indexed to, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
+    event Swap(
+        address indexed sender,
+        address indexed to,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    );
 }
