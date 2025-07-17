@@ -9,7 +9,7 @@ This repository is licensed under a dual license scheme:
 
 2. **GNU General Public License v3.0 or later (GPL-3.0-or-later)**
    - Applies to: All other source files, including `src/abstracts/Liquidity.sol`, libraries, interfaces, tests, and documentation
-   - [See: LICENSE-GPL-3.0](./licenses/LICENSE-GPL-3.0)
+   - See: [LICENSE-GPL-3.0](./licenses/LICENSE-GPL-3.0)
 
 **Summary:**
 - You may use, modify, and distribute the code under the terms of the applicable license for each file.
