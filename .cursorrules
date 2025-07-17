@@ -1,0 +1,181 @@
+I added the list to this rule file, so you can come back to read what has not been done yet. When each task is done you may tell me to mark those tasks as [DONE].
+
+Now I want you to start the testing for me. You don't have to complete them all in one response because you will run out of token. just prioiritize quality over quantity. We will have multiple reponses to complete all tests.
+
+Let's start!
+
+Below is a comprehensive list of tests that should be implemented for the Pennysia AMM codebase in `/src`. This is based on my full understanding of the codebase (from scanning all files via tool calls, including contracts, abstracts, libraries, and interfaces). The tests are designed to cover unit testing, integration testing, edge cases, security scenarios, and fuzz testing. Since the project uses Foundry (via `forge-std`), I recommend writing these in Solidity test files (e.g., `Market.t.sol`, `Liquidity.t.sol`, etc.) that inherit from `Test.sol` for assertions, mocking, and fuzzing.
+
+Tests are grouped by component/file for clarity. Each includes:
+- **Key Scenarios**: Specific behaviors to test.
+- **Why?**: Rationale (e.g., coverage, security).
+- **Type**: Unit, Integration, Edge, Security, Fuzz.
+
+Aim for 100% coverage using Foundry's coverage tools. Use mocks for ERC20 tokens, callbacks (implementing `IPayment`), and external interactions. Include setup functions for common states (e.g., deployed `Market`, initialized pairs).
+
+### 1. **Market.sol** (Core AMM Contract)
+This is the primary contract; tests should cover all public/external functions, events, and internal logic.
+
+- **[DONE]Constructor and setOwner**:
+  - Test owner is set correctly on deployment.
+  - Test only owner can call setOwner; reverts for others.
+  - Test owner change emits no events (or add if needed).
+  - Type: Unit, Security (access control).
+
+- **[DONE]getPairId**:
+  - Test computes correct ID for sorted tokens (token0 < token1).
+  - Test reverts on unsorted/equal tokens (via Validation).
+  - Type: Unit, Edge (zero/equal addresses).
+
+- **[DONE]getReserves**:
+  - Test returns correct long/short reserves for existing pair.
+  - Test returns zeros for non-existent pair.
+  - Test reverts on unsorted tokens.
+  - Type: Unit, Integration (after liquidity add).
+
+- **[DONE]getSweepable**:
+  - Test computes correct sweepable amount (balance - tracked balance).
+  - Test with mocked token balances.
+  - Type: Unit.
+
+- **[DONE]sweep**:
+  - Test owner can sweep multiple tokens/amounts to destinations.
+  - Test reverts for non-owner, excessive amounts, length mismatches.
+  - Test emits Sweep event.
+  - Test nonReentrant and noDelegateCall prevent attacks.
+  - Type: Integration, Security (reentrancy), Edge (zero amounts, max uint).
+
+- **[DONE]flash**:
+  - Test flashes tokens, computes 0.1% fee, calls callback with payback.
+  - Test reverts on invalid callback/to (self-address), length mismatches.
+  - Test emits Flash event.
+  - Test callback verification (via Callback.sol) reverts on underpayment.
+  - Test multi-token flash.
+  - Type: Integration, Security (flash loan attacks), Fuzz (random amounts/tokens).
+
+- **[DONE]createLiquidity**:
+  - Test creates new pair with initial reserves/LP mint (1M each).
+  - Test adds to existing pair, computes proportional LP.
+  - Test callback payment and balance updates.
+  - Test reverts on unsorted tokens, self-to, insufficient min liquidity.
+  - Test emits Create and Mint events.
+  - Type: Integration, Edge (min/initial amounts, large values), Fuzz (random liquidity splits).
+
+- **[DONE]withdrawLiquidity**:
+  - Test burns LP, computes amounts with 0.3% fee (20% to protocol).
+  - Test updates reserves/balances, mints protocol fees.
+  - Test callback for LP transfer to zero.
+  - Test reverts on non-existent pair, unsorted tokens, insufficient LP.
+  - Test emits Burn event.
+  - Type: Integration, Security (JIT attack simulation), Edge (full/partial withdraw, fee skips).
+
+- **swap**:
+  - Test single-hop swap: input payment, reserve updates, fee to long positions, output transfer.
+  - Test multi-hop: chaining amounts across paths.
+  - Test reverts on invalid path (length <2, non-existent pairs), zero amount, self-to/callback.
+  - Test emits Swap event.
+  - Test callback verification reverts on underpayment.
+  - Type: Integration, Security (manipulation via large swaps), Fuzz (random paths/amounts), Edge (min/max reserves).
+  - **NOTE**: Currently has arithmetic underflow bug in Market.sol line 351 - needs fix before tests can pass.
+
+- **Internal Functions** (_updatePair, _updateBalance):
+  - Test reserve updates, cbrt oracle accumulation, timestamp.
+  - Test reverts on zero reserves (minimumLiquidity).
+  - Test balance tracking.
+  - Type: Unit, Integration (called in liquidity/swap).
+
+- **Overall Contract**:
+  - Test invariants: Reserves always >0 post-op, long/short sums consistent.
+  - Test gas usage for key flows.
+  - Type: Integration, Fuzz.
+
+### 2. **abstracts/Liquidity.sol** (LP Token Management)
+- **Core ERC20 Functions** (name, symbol, decimals, totalSupply, balanceOf):
+  - Test returns expected values.
+  - Type: Unit.
+
+- **approve and allowance**:
+  - Test sets/retrieves TTL timestamp.
+  - Test zero timestamp revokes.
+  - Type: Unit, Edge (past/future timestamps).
+
+- **transfer and transferFrom**:
+  - Test transfers long/short amounts between accounts.
+  - Test burns when to=zero.
+  - Test reverts on self-transfer, insufficient balance/allowance.
+  - Test emits Transfer event.
+  - Type: Unit, Integration (with Market mint/burn), Security (TTL expiration).
+
+- **permit**:
+  - Test approves via valid signature, increments nonce.
+  - Test reverts on invalid sig, expired deadline, wrong owner.
+  - Test DOMAIN_SEPARATOR changes on chainid fork.
+  - Type: Unit, Security (sig malleability), Fuzz (random sigs/deadlines).
+
+- **_mint and _burn** (internal):
+  - Test updates totals/balances, emits events.
+  - Test overflow/underflow prevention.
+  - Type: Unit, Edge.
+
+### 3. **abstracts/ReentrancyGuard.sol**
+- Test nonReentrant modifier prevents reentrancy (e.g., mock recursive call).
+- Test allows non-reentrant calls.
+- Type: Security.
+
+### 4. **abstracts/NoDelegatecall.sol**
+- Test noDelegateCall modifier reverts on delegatecall.
+- Test allows direct calls.
+- Type: Security.
+
+### 5. **abstracts/Deadline.sol**
+- Test ensure modifier passes before deadline, reverts after.
+- Type: Unit, Edge (block.timestamp edge).
+
+### 6. **[DONE]libraries/Math.sol**
+- **[DONE]fullMulDiv and fullMulDivUp**:
+  - Test precise mul/div, rounding up/down.
+  - Test reverts on overflow/zero denominator.
+  - Type: Unit, Fuzz (random x/y/d), Edge (max uint, zero).
+
+- **[DONE]divUp**:
+  - Test ceiling division, reverts on zero d.
+  - Type: Unit, Fuzz.
+
+- **[DONE]cbrt**:
+  - Test cube root for various inputs (perfect cubes, large/small).
+  - Type: Unit, Fuzz.
+
+### 7. **libraries/Callback.sol**
+- **tokenCallback**:
+  - Test records balances, calls IPayment, verifies paybacks.
+  - Test reverts on underpayment.
+  - Type: Unit, Integration (with mocks).
+
+- **liquidityCallback**:
+  - Test calls IPayment, verifies totalSupply decreases.
+  - Test reverts on insufficient burn.
+  - Type: Unit, Integration.
+
+### 8. **[DONE]libraries/Validation.sol**
+- **[DONE]Test all checks: notThis, notZero, equalLengths, checkTokenOrder.
+- **[DONE]Test reverts appropriately.
+- Type: Unit, Edge.
+
+### 9. **libraries/TransferHelper.sol**
+- **safeTransfer**:
+  - Test ERC20/ETH transfers succeed/fail appropriately.
+  - Test reverts on failure.
+  - Type: Unit, Edge (zero amount, invalid token).
+
+### 10. **interfaces/** (IMarket, ILiquidity, IPayment, IERC20)
+- No runtime logic, but test implementations match interfaces (e.g., via type checks in tests).
+- Type: Integration.
+
+### Additional Test Suites
+- **Full Flows**: Add liquidity → Swap (single/multi) → Withdraw → Flash loan arbitrage.
+- **Security Audits**: Flash loan + reentrancy, oracle manipulation (multi-block), fee model exploits, callback attacks.
+- **Invariants**: Post-op checks (e.g., reserves >0, balances match totals).
+- **Fuzz Suite**: Cross-contract fuzzing for random inputs/sequences.
+- **Gas Benchmarks**: Profile key functions.
+
+Implement in files like `test/Market.t.sol`, using `vm.prank`, `vm.expectRevert`, etc. Run with `forge test --coverage`. If you need code skeletons for any, let me know!

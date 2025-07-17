@@ -1,0 +1,19 @@
+Pennysia V1-Core — License Notice
+==================================
+
+This repository uses a dual license scheme:
+
+- **BUSL-1.1** (Business Source License 1.1):
+  - Applies to:
+    - src/Market.sol
+  - Restricts production use without a commercial license until 2029-07-17.
+
+- **GPL-3.0-or-later** (GNU General Public License v3.0 or later):
+  - Applies to:
+    - All other source files (including src/abstracts/Liquidity.sol, libraries, interfaces, tests, documentation, etc.)
+
+**For commercial licensing of BUSL-1.1 components, contact:** dev@pennysia.com
+
+**On 2029-07-17, all BUSL-1.1 components will convert to GPL-3.0-or-later.**
+
+See LICENSE, LICENSE-BUSL-1.1, and LICENSE-GPL-3.0 for full terms. 
