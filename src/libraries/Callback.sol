@@ -16,7 +16,6 @@ library Callback {
         uint256[] memory paybackAmounts
     ) internal {
         uint256 len = tokens.length;
-
         IPayment(caller).requestToken(to, tokens, paybackAmounts); // user paybacks
 
         // Verify payback amounts for each token
@@ -37,13 +36,14 @@ library Callback {
         ILiquidity.LpInfo memory lpInfoBefore
     ) internal {
         ILiquidity lpContract = ILiquidity(address(this));
-
         IPayment(caller).requestLiquidity(to, poolId, amountLongX, amountShortX, amountLongY, amountShortY); // user paybacks
 
-        ILiquidity.LpInfo memory lpInfoAfter = lpContract.totalSupply(poolId);
-        require(lpInfoAfter.longX <= lpInfoBefore.longX - amountLongX, InsufficientPayback());
-        require(lpInfoAfter.shortX <= lpInfoBefore.shortX - amountShortX, InsufficientPayback());
-        require(lpInfoAfter.longY <= lpInfoBefore.longY - amountLongY, InsufficientPayback());
-        require(lpInfoAfter.shortY <= lpInfoBefore.shortY - amountShortY, InsufficientPayback());
+        (uint128 longXAfter, uint128 shortXAfter, uint128 longYAfter, uint128 shortYAfter) =
+            lpContract.totalSupply(poolId);
+
+        require(longXAfter <= lpInfoBefore.longX - amountLongX, InsufficientPayback());
+        require(shortXAfter <= lpInfoBefore.shortX - amountShortX, InsufficientPayback());
+        require(longYAfter <= lpInfoBefore.longY - amountLongY, InsufficientPayback());
+        require(shortYAfter <= lpInfoBefore.shortY - amountShortY, InsufficientPayback());
     }
 }

@@ -63,14 +63,26 @@ interface ILiquidity {
 
     /// @notice Returns the total supply of LP tokens
     /// @param poolId The poolId of the token
-    /// @return The total supply information containing long and short positions
-    function totalSupply(uint256 poolId) external view returns (LpInfo memory);
+    /// @return longX Amount of long position X tokens
+    /// @return shortX Amount of short position X tokens
+    /// @return longY Amount of long position Y tokens
+    /// @return shortY Amount of short position Y tokens
+    function totalSupply(uint256 poolId)
+        external
+        view
+        returns (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY);
 
     /// @notice Returns the LP token balance of an account
     /// @param account The address to query the balance of
     /// @param poolId The poolId of the token
-    /// @return The LP token balance of the account
-    function balanceOf(address account, uint256 poolId) external view returns (LpInfo memory);
+    /// @return longX Amount of long position X tokens
+    /// @return shortX Amount of short position X tokens
+    /// @return longY Amount of long position Y tokens
+    /// @return shortY Amount of short position Y tokens
+    function balanceOf(address account, uint256 poolId)
+        external
+        view
+        returns (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY);
 
     /// @notice Returns the current allowance status between owner and spender
     /// @param owner The address of the token owner

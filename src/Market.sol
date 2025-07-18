@@ -19,10 +19,10 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     uint8 private constant FEE = 3; // 0.3%
     uint256 private constant SCALE = 340282366920938463463374607431768211456; // 2**128
 
-    address public owner;
+    address public override owner;
 
-    mapping(uint256 => Pair) public pairs;
-    mapping(address => uint256) public tokenBalances;
+    mapping(uint256 => Pair) public override pairs;
+    mapping(address => uint256) public override tokenBalances;
 
     constructor(address _owner) {
         owner = _owner;
@@ -30,12 +30,12 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
 
     receive() external payable {}
 
-    function setOwner(address _owner) external {
+    function setOwner(address _owner) external override {
         require(msg.sender == owner, forbidden());
         owner = _owner;
     }
 
-    function getPairId(address token0, address token1) public pure returns (uint256 pairId) {
+    function getPairId(address token0, address token1) public pure override returns (uint256 pairId) {
         Validation.checkTokenOrder(token0, token1);
         pairId = PairLibrary.computePairId(token0, token1);
     }
@@ -43,6 +43,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     function getReserves(address token0, address token1)
         public
         view
+        override
         returns (uint128 reserve0Long, uint128 reserve0Short, uint128 reserve1Long, uint128 reserve1Short)
     {
         Validation.checkTokenOrder(token0, token1);
@@ -53,12 +54,13 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         reserve1Short = pairs[pairId].reserve1Short;
     }
 
-    function getSweepable(address token) public view returns (uint256) {
+    function getSweepable(address token) public view override returns (uint256) {
         return PairLibrary.getBalance(token) - tokenBalances[token];
     }
 
     function sweep(address[] calldata tokens, uint256[] calldata amounts, address[] calldata to)
         external
+        override
         nonReentrant
         noDelegateCall
     {
@@ -75,6 +77,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
 
     function flash(address to, address[] calldata tokens, uint256[] calldata amounts)
         external
+        override
         nonReentrant
         noDelegateCall
     {
@@ -283,6 +286,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
 
         // mint 20% of fees to the protocol as reserve and protocol fees
         _mint(address(this), pairId, fee0Long.safe128(), fee0Short.safe128(), fee1Long.safe128(), fee1Short.safe128());
+        emit Mint(callback, address(this), pairId, fee0Long, fee0Short, fee1Long, fee1Short);
 
         TransferHelper.safeTransfer(token0, to, amount0);
         TransferHelper.safeTransfer(token1, to, amount1);

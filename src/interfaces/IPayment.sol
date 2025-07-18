@@ -5,9 +5,9 @@ pragma solidity 0.8.28;
 ///@notice these are payment request callbacks covering mint, burn, flash, and swap
 ///@dev for direct pool interaction, this interface is not needed. see [Market.sol] for more details.
 interface IPayment {
-    /// @notice this is used in mint, flash, and swap
+    /// @notice this is used in createLiquidity, flash, and swap
     /// the caller need to pays specific amounts of tokens to the Market contract.
-    function requestToken(address to, address[] memory tokens, uint256[] memory paybackAmounts) external;
+    function requestToken(address to, address[] memory tokens, uint256[] memory paybackAmounts) external payable;
 
     /// @notice this is used in burn
     /// the caller need to pays specific amounts of liquidity tokens by transferring them to address(0).

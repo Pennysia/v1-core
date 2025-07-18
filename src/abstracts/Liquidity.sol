@@ -67,12 +67,32 @@ abstract contract Liquidity is ILiquidity, Deadline {
     }
 
     /// @notice Returns the total supply of LP tokens
-    function totalSupply(uint256 poolId) public view override returns (LpInfo memory) {
-        return _totalSupply[poolId];
+    function totalSupply(uint256 poolId)
+        public
+        view
+        override
+        returns (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY)
+    {
+        return (
+            _totalSupply[poolId].longX,
+            _totalSupply[poolId].shortX,
+            _totalSupply[poolId].longY,
+            _totalSupply[poolId].shortY
+        );
     }
 
-    function balanceOf(address account, uint256 poolId) public view override returns (LpInfo memory) {
-        return _balances[account][poolId];
+    function balanceOf(address account, uint256 poolId)
+        public
+        view
+        override
+        returns (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY)
+    {
+        return (
+            _balances[account][poolId].longX,
+            _balances[account][poolId].shortX,
+            _balances[account][poolId].longY,
+            _balances[account][poolId].shortY
+        );
     }
 
     /// @notice Approves or revokes permission for a spender to transfer tokens

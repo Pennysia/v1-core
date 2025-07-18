@@ -782,11 +782,11 @@ contract MarketTest is Test {
         assertTrue(r1S != effectiveAmount, "reserve1Short should have changed");
 
         // Protocol fees should have been minted
-        ILiquidity.LpInfo memory protocolBal = market.balanceOf(address(market), pairId);
-        assertTrue(protocolBal.longX > 0, "Protocol should have received fees");
-        assertTrue(protocolBal.shortX > 0, "Protocol should have received fees");
-        assertTrue(protocolBal.longY > 0, "Protocol should have received fees");
-        assertTrue(protocolBal.shortY > 0, "Protocol should have received fees");
+        (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY) = market.balanceOf(address(market), pairId);
+        assertTrue(longX > 0, "Protocol should have received fees");
+        assertTrue(shortX > 0, "Protocol should have received fees");
+        assertTrue(longY > 0, "Protocol should have received fees");
+        assertTrue(shortY > 0, "Protocol should have received fees");
 
         // tokenBalances should have decreased
         assertTrue(market.tokenBalances(token0) < initAmount * 2, "token0 balance should decrease");
@@ -870,14 +870,13 @@ contract MarketTest is Test {
         vm.prank(address(liquidityCallback));
         market.withdrawLiquidity(to, token0, token1, withdraw, withdraw, withdraw, withdraw);
 
-        ILiquidity.LpInfo memory protocolBal = market.balanceOf(address(market), pairId);
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY) = market.balanceOf(address(market), pairId);
         // After full withdrawal, reserves should equal protocol fees (minimum liquidity)
-        assertTrue(r0L > 0 && r0S > 0 && r1L > 0 && r1S > 0, "Reserves should be > 0 after full withdraw");
-        assertTrue(r0L >= protocolBal.longX, "reserve0Long >= protocol longX");
-        assertTrue(r0S >= protocolBal.shortX, "reserve0Short >= protocol shortX");
-        assertTrue(r1L >= protocolBal.longY, "reserve1Long >= protocol longY");
-        assertTrue(r1S >= protocolBal.shortY, "reserve1Short >= protocol shortY");
+        assertTrue(longX > 0 && shortX > 0 && longY > 0 && shortY > 0, "Reserves should be > 0 after full withdraw");
+        assertTrue(longX >= longX, "reserve0Long >= protocol longX");
+        assertTrue(shortX >= shortX, "reserve0Short >= protocol shortX");
+        assertTrue(longY >= longY, "reserve1Long >= protocol longY");
+        assertTrue(shortY >= shortY, "reserve1Short >= protocol shortY");
     }
 
     function test_WithdrawLiquidityEdgeZeroLiquidity() public {
@@ -1260,18 +1259,18 @@ contract MarketTest is Test {
             market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Check LP balance
-        ILiquidity.LpInfo memory balance = market.balanceOf(address(this), pairId);
-        console.log("LP Balance - longX:", balance.longX);
-        console.log("LP Balance - shortX:", balance.shortX);
-        console.log("LP Balance - longY:", balance.longY);
-        console.log("LP Balance - shortY:", balance.shortY);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.balanceOf(address(this), pairId);
+        console.log("LP Balance - longX:", longX1);
+        console.log("LP Balance - shortX:", shortX1);
+        console.log("LP Balance - longY:", longY1);
+        console.log("LP Balance - shortY:", shortY1);
 
         // Check total supply
-        ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
-        console.log("Total Supply - longX:", totalSupply.longX);
-        console.log("Total Supply - shortX:", totalSupply.shortX);
-        console.log("Total Supply - longY:", totalSupply.longY);
-        console.log("Total Supply - shortY:", totalSupply.shortY);
+        (uint128 longX2, uint128 shortX2, uint128 longY2, uint128 shortY2) = market.totalSupply(pairId);
+        console.log("Total Supply - longX:", longX2);
+        console.log("Total Supply - shortX:", shortX2);
+        console.log("Total Supply - longY:", longY2);
+        console.log("Total Supply - shortY:", shortY2);
 
         // Set up approval
         liquidityCallback.setLpOwner(address(this));
@@ -1285,10 +1284,10 @@ contract MarketTest is Test {
 
         // Check if we have enough balance
         console.log("Trying to transfer 1 of each type");
-        console.log("Available longX:", balance.longX);
-        console.log("Available shortX:", balance.shortX);
-        console.log("Available longY:", balance.longY);
-        console.log("Available shortY:", balance.shortY);
+        console.log("Available longX:", longX1);
+        console.log("Available shortX:", shortX1);
+        console.log("Available longY:", longY1);
+        console.log("Available shortY:", shortY1);
 
         // Try to transfer small amount using transfer (not transferFrom)
         try market.transfer(address(0), pairId, 1, 1, 1, 1) {
@@ -1335,8 +1334,8 @@ contract MarketTest is Test {
         market.approve(spender, pairId, block.timestamp + 3600);
 
         // Check balance before transfer
-        ILiquidity.LpInfo memory balanceBefore = market.balanceOf(address(this), pairId);
-        console.log("Balance before - longX:", balanceBefore.longX);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.balanceOf(address(this), pairId);
+        console.log("Balance before - longX:", longX1);
 
         // Try transferFrom as the spender with large amount
         vm.prank(spender);
@@ -1349,8 +1348,8 @@ contract MarketTest is Test {
         }
 
         // Check balance after transfer
-        ILiquidity.LpInfo memory balanceAfter = market.balanceOf(address(this), pairId);
-        console.log("Balance after - longX:", balanceAfter.longX);
+        (uint128 longX2, uint128 shortX2, uint128 longY2, uint128 shortY2) = market.balanceOf(address(this), pairId);
+        console.log("Balance after - longX:", longX2);
     }
 
     // Debug test for allowance and transferFrom
@@ -1399,8 +1398,8 @@ contract MarketTest is Test {
         console.log("Self allowance after approval:", selfAllowanceAfter);
 
         // Check balance
-        ILiquidity.LpInfo memory balance = market.balanceOf(address(this), pairId);
-        console.log("Balance longX:", balance.longX);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.balanceOf(address(this), pairId);
+        console.log("Balance longX:", longX1);
 
         // Try direct transferFrom call (should work now)
         try market.transferFrom(address(this), address(0), pairId, 1, 1, 1, 1) {
@@ -1490,17 +1489,17 @@ contract MarketTest is Test {
         console.log("All checks passed, now trying withdrawLiquidity...");
 
         // Check LP balance and total supply before withdrawal
-        ILiquidity.LpInfo memory userBalance = market.balanceOf(address(this), pairId);
-        console.log("User LP balance - longX:", userBalance.longX);
-        console.log("User LP balance - shortX:", userBalance.shortX);
-        console.log("User LP balance - longY:", userBalance.longY);
-        console.log("User LP balance - shortY:", userBalance.shortY);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.balanceOf(address(this), pairId);
+        console.log("User LP balance - longX:", longX1);
+        console.log("User LP balance - shortX:", shortX1);
+        console.log("User LP balance - longY:", longY1);
+        console.log("User LP balance - shortY:", shortY1);
 
-        ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
-        console.log("Total supply - longX:", totalSupply.longX);
-        console.log("Total supply - shortX:", totalSupply.shortX);
-        console.log("Total supply - longY:", totalSupply.longY);
-        console.log("Total supply - shortY:", totalSupply.shortY);
+        (uint128 longX2, uint128 shortX2, uint128 longY2, uint128 shortY2) = market.totalSupply(pairId);
+        console.log("Total supply - longX:", longX2);
+        console.log("Total supply - shortX:", shortX2);
+        console.log("Total supply - longY:", longY2);
+        console.log("Total supply - shortY:", shortY2);
 
         // Try the actual call
         vm.prank(address(liquidityCallback));
@@ -1533,31 +1532,34 @@ contract MarketTest is Test {
         (uint256 pairId,,,,) =
             market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
-        // Check initial state
-        ILiquidity.LpInfo memory balanceBefore = market.balanceOf(address(this), pairId);
-        ILiquidity.LpInfo memory totalSupplyBefore = market.totalSupply(pairId);
+        // Check user LP balance before burn
+        (uint128 longXBefore, uint128 shortXBefore, uint128 longYBefore, uint128 shortYBefore) =
+            market.balanceOf(address(this), pairId);
+        (uint128 totalLongXBefore, uint128 totalShortXBefore, uint128 totalLongYBefore, uint128 totalShortYBefore) =
+            market.totalSupply(pairId);
 
-        console.log("Before burn:");
-        console.log("User balance longX:", balanceBefore.longX);
-        console.log("Total supply longX:", totalSupplyBefore.longX);
+        // Set up callback to burn LP from this contract
+        MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
+        liquidityCallback.setLpOwner(address(this));
+        market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
 
-        // Try to burn directly using transfer to address(0)
-        uint256 burnAmount = 100000;
+        // Burn 200,000 LP tokens (for example)
+        uint256 burnAmount = 200000;
         market.transfer(
             address(0), pairId, uint128(burnAmount), uint128(burnAmount), uint128(burnAmount), uint128(burnAmount)
         );
 
-        // Check after burn
-        ILiquidity.LpInfo memory balanceAfter = market.balanceOf(address(this), pairId);
-        ILiquidity.LpInfo memory totalSupplyAfter = market.totalSupply(pairId);
+        // Check user LP balance and total supply after burn
+        (uint128 longXAfter, uint128 shortXAfter, uint128 longYAfter, uint128 shortYAfter) =
+            market.balanceOf(address(this), pairId);
+        (uint128 totalLongXAfter, uint128 totalShortXAfter, uint128 totalLongYAfter, uint128 totalShortYAfter) =
+            market.totalSupply(pairId);
 
-        console.log("After burn:");
-        console.log("User balance longX:", balanceAfter.longX);
-        console.log("Total supply longX:", totalSupplyAfter.longX);
-
-        // Verify the burn worked
-        assertEq(balanceAfter.longX, balanceBefore.longX - burnAmount, "User balance should decrease");
-        assertEq(totalSupplyAfter.longX, totalSupplyBefore.longX - burnAmount, "Total supply should decrease");
+        // The user's balance should decrease by the burn amount
+        assertEq(longXAfter, longXBefore - burnAmount, "User balance should decrease by burn amount");
+        // For direct transfer burn, no protocol fee is minted
+        uint256 expectedTotalSupply = totalLongXBefore - burnAmount;
+        assertEq(totalLongXAfter, expectedTotalSupply, "Total supply should decrease by burn amount");
     }
 
     // Simple test to isolate callback issue
@@ -1617,17 +1619,17 @@ contract MarketTest is Test {
             market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         console.log("=== After createLiquidity ===");
-        ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
-        console.log("Total supply longX:", totalSupply.longX);
-        console.log("Total supply shortX:", totalSupply.shortX);
-        console.log("Total supply longY:", totalSupply.longY);
-        console.log("Total supply shortY:", totalSupply.shortY);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.totalSupply(pairId);
+        console.log("Total supply longX:", longX1);
+        console.log("Total supply shortX:", shortX1);
+        console.log("Total supply longY:", longY1);
+        console.log("Total supply shortY:", shortY1);
 
-        ILiquidity.LpInfo memory userBalance = market.balanceOf(address(this), pairId);
-        console.log("User balance longX:", userBalance.longX);
-        console.log("User balance shortX:", userBalance.shortX);
-        console.log("User balance longY:", userBalance.longY);
-        console.log("User balance shortY:", userBalance.shortY);
+        (uint128 longX2, uint128 shortX2, uint128 longY2, uint128 shortY2) = market.balanceOf(address(this), pairId);
+        console.log("User balance longX:", longX2);
+        console.log("User balance shortX:", shortX2);
+        console.log("User balance longY:", longY2);
+        console.log("User balance shortY:", shortY2);
 
         // Set up callback
         liquidityCallback.setLpOwner(address(this));
@@ -1640,17 +1642,17 @@ contract MarketTest is Test {
         try liquidityCallback.requestLiquidity(address(0xDEF), pairId, 1, 1, 1, 1) {
             console.log("Direct callback succeeded");
 
-            ILiquidity.LpInfo memory totalSupplyAfter = market.totalSupply(pairId);
-            console.log("Total supply after direct callback longX:", totalSupplyAfter.longX);
-            console.log("Total supply after direct callback shortX:", totalSupplyAfter.shortX);
-            console.log("Total supply after direct callback longY:", totalSupplyAfter.longY);
-            console.log("Total supply after direct callback shortY:", totalSupplyAfter.shortY);
+            (uint128 longX3, uint128 shortX3, uint128 longY3, uint128 shortY3) = market.totalSupply(pairId);
+            console.log("Total supply after direct callback longX:", longX3);
+            console.log("Total supply after direct callback shortX:", shortX3);
+            console.log("Total supply after direct callback longY:", longY3);
+            console.log("Total supply after direct callback shortY:", shortY3);
 
-            ILiquidity.LpInfo memory userBalanceAfter = market.balanceOf(address(this), pairId);
-            console.log("User balance after direct callback longX:", userBalanceAfter.longX);
-            console.log("User balance after direct callback shortX:", userBalanceAfter.shortX);
-            console.log("User balance after direct callback longY:", userBalanceAfter.longY);
-            console.log("User balance after direct callback shortY:", userBalanceAfter.shortY);
+            (uint128 longX4, uint128 shortX4, uint128 longY4, uint128 shortY4) = market.balanceOf(address(this), pairId);
+            console.log("User balance after direct callback longX:", longX4);
+            console.log("User balance after direct callback shortX:", shortX4);
+            console.log("User balance after direct callback longY:", longY4);
+            console.log("User balance after direct callback shortY:", shortY4);
         } catch Error(string memory reason) {
             console.log("Direct callback failed with reason:", reason);
         } catch (bytes memory) {
@@ -1693,17 +1695,17 @@ contract MarketTest is Test {
             market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         console.log("=== Initial state ===");
-        ILiquidity.LpInfo memory totalSupply = market.totalSupply(pairId);
-        console.log("Total supply longX:", totalSupply.longX);
-        console.log("Total supply shortX:", totalSupply.shortX);
-        console.log("Total supply longY:", totalSupply.longY);
-        console.log("Total supply shortY:", totalSupply.shortY);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.totalSupply(pairId);
+        console.log("Total supply longX:", longX1);
+        console.log("Total supply shortX:", shortX1);
+        console.log("Total supply longY:", longY1);
+        console.log("Total supply shortY:", shortY1);
 
-        ILiquidity.LpInfo memory userBalance = market.balanceOf(address(this), pairId);
-        console.log("User balance longX:", userBalance.longX);
-        console.log("User balance shortX:", userBalance.shortX);
-        console.log("User balance longY:", userBalance.longY);
-        console.log("User balance shortY:", userBalance.shortY);
+        (uint128 longX2, uint128 shortX2, uint128 longY2, uint128 shortY2) = market.balanceOf(address(this), pairId);
+        console.log("User balance longX:", longX2);
+        console.log("User balance shortX:", shortX2);
+        console.log("User balance longY:", longY2);
+        console.log("User balance shortY:", shortY2);
 
         // Set up callback to burn LP from this contract
         liquidityCallback.setLpOwner(address(this));
@@ -1769,8 +1771,8 @@ contract MarketTest is Test {
         console.log("Is allowance >= block.timestamp?", allowanceAfter >= block.timestamp);
 
         // Check balance
-        ILiquidity.LpInfo memory balance = market.balanceOf(address(this), pairId);
-        console.log("User balance longX:", balance.longX);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.balanceOf(address(this), pairId);
+        console.log("User balance longX:", longX1);
 
         // Try direct transferFrom call with smallest amounts
         console.log("Attempting direct transferFrom...");
@@ -1841,8 +1843,8 @@ contract MarketTest is Test {
         assertTrue(retAmount1 >= 0, "Amount1 should be >= 0");
 
         // Verify the withdrawal actually happened (total supply should decrease)
-        ILiquidity.LpInfo memory totalSupplyAfter = market.totalSupply(pairId);
-        assertEq(totalSupplyAfter.longX, 2000000 - withdraw, "Total supply should decrease by withdraw amount");
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.totalSupply(pairId);
+        assertEq(longX1, 2000000 - withdraw, "Total supply should decrease by withdraw amount");
     }
 
     // Isolated test to debug callback transferFrom issue
@@ -1867,11 +1869,11 @@ contract MarketTest is Test {
             market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Check balances and allowances before attempting transferFrom
-        ILiquidity.LpInfo memory userBalance = market.balanceOf(address(this), pairId);
-        console.log("User balance longX:", userBalance.longX);
-        console.log("User balance shortX:", userBalance.shortX);
-        console.log("User balance longY:", userBalance.longY);
-        console.log("User balance shortY:", userBalance.shortY);
+        (uint128 longX1, uint128 shortX1, uint128 longY1, uint128 shortY1) = market.balanceOf(address(this), pairId);
+        console.log("User balance longX:", longX1);
+        console.log("User balance shortX:", shortX1);
+        console.log("User balance longY:", longY1);
+        console.log("User balance shortY:", shortY1);
 
         // Set up approval
         liquidityCallback.setLpOwner(address(this));
@@ -1930,5 +1932,59 @@ contract MarketTest is Test {
                 console.logBytes4(selector);
             }
         }
+    }
+
+    function test_WithdrawLiquidityProtocolFee() public {
+        MockCreateLiquidityCallback tokenCallback = new MockCreateLiquidityCallback(market);
+        MockLiquidityCallback liquidityCallback = new MockLiquidityCallback(market);
+        MockERC20 mockTokenA = new MockERC20();
+        MockERC20 mockTokenB = new MockERC20();
+
+        // Ensure proper token ordering
+        address token0 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenA) : address(mockTokenB);
+        address token1 = address(mockTokenA) < address(mockTokenB) ? address(mockTokenB) : address(mockTokenA);
+        MockERC20 mockToken0 = MockERC20(token0);
+        MockERC20 mockToken1 = MockERC20(token1);
+
+        // Add initial liquidity
+        uint256 initAmount = 2000;
+        mockToken0.setBalance(address(tokenCallback), initAmount * 2);
+        mockToken1.setBalance(address(tokenCallback), initAmount * 2);
+        vm.prank(address(tokenCallback));
+        (uint256 pairId,,,,) =
+            market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
+
+        // Check user LP balance before withdraw
+        (uint128 longXBefore, uint128 shortXBefore, uint128 longYBefore, uint128 shortYBefore) =
+            market.balanceOf(address(this), pairId);
+        (uint128 totalLongXBefore, uint128 totalShortXBefore, uint128 totalLongYBefore, uint128 totalShortYBefore) =
+            market.totalSupply(pairId);
+
+        // Set up callback to burn LP from this contract
+        liquidityCallback.setLpOwner(address(this));
+        market.approve(address(liquidityCallback), pairId, block.timestamp + 3600);
+
+        // Withdraw 200,000 LP tokens
+        uint256 withdrawAmount = 200000;
+        vm.prank(address(liquidityCallback));
+        market.withdrawLiquidity(
+            address(0xDEF), token0, token1, withdrawAmount, withdrawAmount, withdrawAmount, withdrawAmount
+        );
+
+        // Check user LP balance and total supply after withdraw
+        (uint128 longXAfter, uint128 shortXAfter, uint128 longYAfter, uint128 shortYAfter) =
+            market.balanceOf(address(this), pairId);
+        (uint128 totalLongXAfter, uint128 totalShortXAfter, uint128 totalLongYAfter, uint128 totalShortYAfter) =
+            market.totalSupply(pairId);
+
+        // The user's balance should decrease by the withdraw amount
+        assertEq(longXAfter, longXBefore - withdrawAmount, "User balance should decrease by withdraw amount");
+        // The total supply should decrease by the withdraw amount minus protocol fees minted
+        uint256 fee = (withdrawAmount * 3 + 999) / 1000; // Math.divUp(withdrawAmount * 3, 1000)
+        uint256 protocolFee = (fee * 20) / 100;
+        uint256 expectedTotalSupply = totalLongXBefore - withdrawAmount + protocolFee;
+        assertEq(
+            totalLongXAfter, expectedTotalSupply, "Total supply should decrease by withdraw amount minus protocol fee"
+        );
     }
 }
