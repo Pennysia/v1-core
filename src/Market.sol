@@ -28,6 +28,8 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         owner = _owner;
     }
 
+    receive() external payable {}
+
     function setOwner(address _owner) external {
         require(msg.sender == owner, forbidden());
         owner = _owner;
