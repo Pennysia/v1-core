@@ -286,7 +286,6 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
 
         // mint 20% of fees to the protocol as reserve and protocol fees
         _mint(address(this), pairId, fee0Long.safe128(), fee0Short.safe128(), fee1Long.safe128(), fee1Short.safe128());
-        emit Mint(callback, address(this), pairId, fee0Long, fee0Short, fee1Long, fee1Short);
 
         TransferHelper.safeTransfer(token0, to, amount0);
         TransferHelper.safeTransfer(token1, to, amount1);
