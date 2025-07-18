@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {Callback} from "../src/libraries/Callback.sol";
 import {ILiquidity} from "../src/interfaces/ILiquidity.sol";
 import {IERC20} from "../src/interfaces/IERC20.sol";
+import {PairLibrary} from "../src/libraries/PairLibrary.sol";
 
 // Mock ERC20 for testing
 contract MockERC20 is IERC20 {
@@ -124,8 +125,12 @@ contract CallbackTest is Test {
         // Record initial balance
         uint256 initialBalance = token0.balanceOf(address(this));
 
+        // Prepare balancesBefore
+        uint256[] memory balancesBefore = new uint256[](1);
+        balancesBefore[0] = token0.balanceOf(address(this));
+
         // Call tokenCallback
-        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, amounts);
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
 
         // Check that payment was made
         assertEq(token0.balanceOf(address(this)), initialBalance + 1000, "Should receive payment");
@@ -147,8 +152,13 @@ contract CallbackTest is Test {
         uint256 initialBalance0 = token0.balanceOf(address(this));
         uint256 initialBalance1 = token1.balanceOf(address(this));
 
+        // Prepare balancesBefore
+        uint256[] memory balancesBefore = new uint256[](2);
+        balancesBefore[0] = token0.balanceOf(address(this));
+        balancesBefore[1] = token1.balanceOf(address(this));
+
         // Call tokenCallback
-        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, amounts);
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
 
         // Check that payments were made
         assertEq(token0.balanceOf(address(this)), initialBalance0 + 1000, "Should receive token0 payment");
@@ -169,13 +179,22 @@ contract CallbackTest is Test {
         uint256 initialBalance = token0.balanceOf(address(this));
         assertEq(initialBalance, 0, "Initial balance should be 0");
 
+        // Prepare balancesBefore
+        uint256[] memory balancesBefore = new uint256[](1);
+        balancesBefore[0] = token0.balanceOf(address(this));
+
         // Should revert due to underpayment (pays back 999 instead of 1000)
         vm.expectRevert(Callback.InsufficientPayback.selector);
-        this.callTokenCallback(address(underpayment), tokens, amounts);
+        this.callTokenCallback(address(underpayment), tokens, balancesBefore, amounts);
     }
 
-    function callTokenCallback(address caller, address[] memory tokens, uint256[] memory amounts) external {
-        Callback.tokenCallback(caller, address(0xDEF), tokens, amounts);
+    function callTokenCallback(
+        address caller,
+        address[] memory tokens,
+        uint256[] memory balancesBefore,
+        uint256[] memory amounts
+    ) external {
+        Callback.tokenCallback(caller, address(0xDEF), tokens, balancesBefore, amounts);
     }
 
     function test_TokenCallbackZeroAmount() public {
@@ -183,9 +202,10 @@ contract CallbackTest is Test {
         tokens[0] = address(token0);
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 0;
-
+        uint256[] memory balancesBefore = new uint256[](1);
+        balancesBefore[0] = token0.balanceOf(address(this));
         // Should work with zero amounts
-        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, amounts);
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
     }
 
     function test_TokenCallbackFuzz(uint256 amount) public {
@@ -199,8 +219,10 @@ contract CallbackTest is Test {
         token0.setBalance(address(correctPayment), amount);
 
         uint256 initialBalance = token0.balanceOf(address(this));
+        uint256[] memory balancesBefore = new uint256[](1);
+        balancesBefore[0] = token0.balanceOf(address(this));
 
-        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, amounts);
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
 
         assertEq(token0.balanceOf(address(this)), initialBalance + amount, "Should receive correct payment");
     }
@@ -261,24 +283,19 @@ contract CallbackTest is Test {
 
     // Test checkBal function
     function test_CheckBal() public {
-        uint256 balance = 1000;
-        token0.setBalance(address(this), balance);
-
-        uint256 result = Callback.checkBal(address(token0));
+        uint256 balance = token0.balanceOf(address(this));
+        uint256 result = PairLibrary.getBalance(address(token0));
         assertEq(result, balance, "checkBal should return correct balance");
     }
 
     function test_CheckBalZero() public {
-        uint256 result = Callback.checkBal(address(token0));
+        uint256 result = PairLibrary.getBalance(address(token0));
         assertEq(result, 0, "checkBal should return 0 for zero balance");
     }
 
     function test_CheckBalFuzz(uint256 balance) public {
-        vm.assume(balance <= type(uint128).max);
-
         token0.setBalance(address(this), balance);
-
-        uint256 result = Callback.checkBal(address(token0));
+        uint256 result = PairLibrary.getBalance(address(token0));
         assertEq(result, balance, "checkBal should return correct balance");
     }
 }

@@ -6,6 +6,7 @@ library Validation {
     error lengthError();
     error selfCall();
     error zeroValue();
+    error duplicatedToken();
 
     function checkTokenOrder(address token0, address token1) internal pure {
         require(token0 < token1, tokenError());
@@ -21,5 +22,13 @@ library Validation {
 
     function notZero(uint256 input) internal pure {
         require(input > 0, zeroValue());
+    }
+
+    function checkUnique(address[] memory tokens) internal pure {
+        for (uint256 i = 0; i < tokens.length; i++) {
+            for (uint256 j = i + 1; j < tokens.length; j++) {
+                require(tokens[i] != tokens[j], duplicatedToken());
+            }
+        }
     }
 }

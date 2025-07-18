@@ -431,7 +431,10 @@ contract MarketTest is Test {
     function test_FlashSingleToken() public {
         address token = address(new MockERC20());
         MockERC20 mockToken = MockERC20(token);
-        mockToken.setBalance(address(market), 1000); // Market has tokens to flash
+        uint256 expectedFee = Math.divUp(500, 1000); // 1
+        uint256 expectedPayback = 500 + expectedFee; // 501
+        // Set Market balance to at least the flash amount
+        mockToken.setBalance(address(market), 500);
 
         MockCallback callback = new MockCallback(market);
         address to = address(0xDEF);
@@ -440,16 +443,20 @@ contract MarketTest is Test {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = 500;
 
-        uint256 expectedFee = Math.divUp(500, 1000); // 1
-        uint256 expectedPayback = 500 + expectedFee; // 501
-
         // Set callback balance for payback
         mockToken.setBalance(address(callback), expectedPayback);
+        require(mockToken.balanceOf(address(callback)) >= expectedPayback, "Callback does not have enough balance");
+
+        uint256 initialMarketBalance = mockToken.balanceOf(address(market));
+        emit log_named_uint("Market balance before flash", initialMarketBalance);
 
         vm.prank(address(callback));
         market.flash(to, tokens, amounts);
 
-        assertEq(mockToken.balanceOf(address(market)), 1000 + expectedFee, "Market balance should increase by fee");
+        uint256 finalMarketBalance = mockToken.balanceOf(address(market));
+        emit log_named_uint("Market balance after flash", finalMarketBalance);
+
+        assertEq(finalMarketBalance, initialMarketBalance + expectedFee, "Market balance should increase by fee");
     }
 
     function test_FlashMultiToken() public {
@@ -457,8 +464,13 @@ contract MarketTest is Test {
         address token2 = address(new MockERC20());
         MockERC20 mockToken1 = MockERC20(token1);
         MockERC20 mockToken2 = MockERC20(token2);
-        mockToken1.setBalance(address(market), 1000);
-        mockToken2.setBalance(address(market), 2000);
+        uint256 fee1 = Math.divUp(300, 1000); // 1
+        uint256 fee2 = Math.divUp(600, 1000); // 1
+        uint256 payback1 = 300 + fee1;
+        uint256 payback2 = 600 + fee2;
+        // Set Market balances to at least the flash amounts
+        mockToken1.setBalance(address(market), 300);
+        mockToken2.setBalance(address(market), 600);
 
         MockCallback callback = new MockCallback(market);
         address to = address(0xDEF);
@@ -469,18 +481,59 @@ contract MarketTest is Test {
         amounts[0] = 300;
         amounts[1] = 600;
 
-        uint256 fee1 = Math.divUp(300, 1000); // 1
-        uint256 fee2 = Math.divUp(600, 1000); // 1
-
         // Set callback balances for payback
-        mockToken1.setBalance(address(callback), 300 + fee1);
-        mockToken2.setBalance(address(callback), 600 + fee2);
+        mockToken1.setBalance(address(callback), payback1);
+        mockToken2.setBalance(address(callback), payback2);
+        require(mockToken1.balanceOf(address(callback)) >= payback1, "Callback does not have enough balance for token1");
+        require(mockToken2.balanceOf(address(callback)) >= payback2, "Callback does not have enough balance for token2");
+
+        uint256 initialMarketBalance1 = mockToken1.balanceOf(address(market));
+        uint256 initialMarketBalance2 = mockToken2.balanceOf(address(market));
+        emit log_named_uint("Token1 market balance before flash", initialMarketBalance1);
+        emit log_named_uint("Token2 market balance before flash", initialMarketBalance2);
 
         vm.prank(address(callback));
         market.flash(to, tokens, amounts);
 
-        assertEq(mockToken1.balanceOf(address(market)), 1000 + fee1, "Token1 balance increased by fee");
-        assertEq(mockToken2.balanceOf(address(market)), 2000 + fee2, "Token2 balance increased by fee");
+        uint256 finalMarketBalance1 = mockToken1.balanceOf(address(market));
+        uint256 finalMarketBalance2 = mockToken2.balanceOf(address(market));
+        emit log_named_uint("Token1 market balance after flash", finalMarketBalance1);
+        emit log_named_uint("Token2 market balance after flash", finalMarketBalance2);
+
+        assertEq(finalMarketBalance1, initialMarketBalance1 + fee1, "Token1 balance should increase by fee");
+        assertEq(finalMarketBalance2, initialMarketBalance2 + fee2, "Token2 balance should increase by fee");
+    }
+
+    function test_FlashFuzz(uint256 amount) public {
+        vm.assume(amount > 0 && amount < type(uint256).max / 1000);
+        address token = address(new MockERC20());
+        MockERC20 mockToken = MockERC20(token);
+        uint256 expectedFee = Math.divUp(amount, 1000);
+        uint256 payback = amount + expectedFee;
+        // Set Market balance to at least the flash amount
+        mockToken.setBalance(address(market), amount);
+
+        MockCallback callback = new MockCallback(market);
+        address to = address(0xDEF);
+        address[] memory tokens = new address[](1);
+        tokens[0] = token;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amount;
+
+        // Set callback balance
+        mockToken.setBalance(address(callback), payback);
+        require(mockToken.balanceOf(address(callback)) >= payback, "Callback does not have enough balance");
+
+        uint256 initialMarketBalance = mockToken.balanceOf(address(market));
+        emit log_named_uint("Market balance before flash (fuzz)", initialMarketBalance);
+
+        vm.prank(address(callback));
+        market.flash(to, tokens, amounts);
+
+        uint256 finalMarketBalance = mockToken.balanceOf(address(market));
+        emit log_named_uint("Market balance after flash (fuzz)", finalMarketBalance);
+
+        assertEq(finalMarketBalance, initialMarketBalance + expectedFee, "Balance should increase by fee");
     }
 
     function test_FlashRevertsOnInvalidCallback() public {
@@ -519,32 +572,6 @@ contract MarketTest is Test {
         vm.expectRevert(Callback.InsufficientPayback.selector);
         vm.prank(address(callback));
         market.flash(to, tokens, amounts);
-    }
-
-    function test_FlashFuzz(uint256 amount) public {
-        vm.assume(amount > 0 && amount < type(uint256).max / 1000);
-        address token = address(new MockERC20());
-        MockERC20 mockToken = MockERC20(token);
-        uint256 initialBalance = amount * 2;
-        mockToken.setBalance(address(market), initialBalance);
-
-        MockCallback callback = new MockCallback(market);
-        address to = address(0xDEF);
-        address[] memory tokens = new address[](1);
-        tokens[0] = token;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
-
-        uint256 expectedFee = Math.divUp(amount, 1000);
-        uint256 payback = amount + expectedFee;
-
-        // Set callback balance
-        mockToken.setBalance(address(callback), payback);
-
-        vm.prank(address(callback));
-        market.flash(to, tokens, amounts);
-
-        assertEq(mockToken.balanceOf(address(market)), initialBalance + expectedFee, "Balance should increase by fee");
     }
 
     // Tests for createLiquidity

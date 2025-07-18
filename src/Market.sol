@@ -52,7 +52,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     }
 
     function getSweepable(address token) public view returns (uint256) {
-        return Callback.checkBal(token) - tokenBalances[token];
+        return PairLibrary.getBalance(token) - tokenBalances[token];
     }
 
     function sweep(address[] calldata tokens, uint256[] calldata amounts, address[] calldata to)
@@ -78,17 +78,20 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     {
         address callback = msg.sender;
         uint256 length = tokens.length;
-        Validation.equalLengths(length, amounts.length);
         Validation.notThis(to);
+        Validation.equalLengths(length, amounts.length);
+        Validation.checkUnique(tokens);
+
         uint256[] memory paybackAmounts = new uint256[](length);
-        uint256[] memory fees = new uint256[](length);
+        uint256[] memory balancesBefore = new uint256[](length);
+
         for (uint256 i; i < length; i++) {
+            paybackAmounts[i] = amounts[i] + Math.divUp(amounts[i], 1000); // include 0.1% fee (10 bps)
             TransferHelper.safeTransfer(tokens[i], to, amounts[i]);
-            fees[i] = Math.divUp(amounts[i], 1000); // 0.1% fee (10 bps)
-            paybackAmounts[i] = amounts[i] + fees[i];
+            balancesBefore[i] = PairLibrary.getBalance(tokens[i]);
         }
-        // user performs actions in callback and payback.
-        Callback.tokenCallback(callback, to, tokens, paybackAmounts);
+        // user performs actions and payback in the callback.
+        Callback.tokenCallback(callback, to, tokens, balancesBefore, paybackAmounts);
         emit Flash(callback, to, tokens, amounts, paybackAmounts);
     }
 
@@ -124,7 +127,11 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = amount0Long + amount0Short;
         amounts[1] = amount1Long + amount1Short;
-        Callback.tokenCallback(callback, to, tokens, amounts); //user pays within this callback
+        uint256[] memory balancesBefore = new uint256[](2);
+        balancesBefore[0] = PairLibrary.getBalance(token0);
+        balancesBefore[1] = PairLibrary.getBalance(token1);
+
+        Callback.tokenCallback(callback, to, tokens, balancesBefore, amounts); //user pays within this callback
 
         uint256 reserve0Long;
         uint256 reserve0Short;
@@ -327,7 +334,6 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         amountIn[0] = amount;
         address[] memory tokenIn = new address[](1);
         tokenIn[0] = path[0];
-        Callback.tokenCallback(callback, to, tokenIn, amountIn); //user pays within this callback
 
         for (uint256 i; i < length - 1; i++) {
             (address token0, address token1, bool zeroForOne) =
@@ -382,7 +388,13 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             _updateBalance(token0, token1, newBalance0, newBalance1);
         }
 
-        TransferHelper.safeTransfer(path[length - 1], to, amountOut);
+        amountIn[0] = amount;
+        uint256[] memory balancesBefore = new uint256[](1);
+        balancesBefore[0] = PairLibrary.getBalance(path[0]);
+        Callback.tokenCallback(callback, to, tokenIn, balancesBefore, amountIn); //user pays within this callback
+
+        TransferHelper.safeTransfer(path[length - 1], to, amountOut); // transfer the output token to the user
+
         emit Swap(callback, to, path[0], path[length - 1], amount, amountOut);
     }
 }
