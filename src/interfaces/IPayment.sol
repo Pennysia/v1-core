@@ -15,9 +15,9 @@ interface IPayment {
     function requestLiquidity(
         address to,
         uint256 poolId,
-        uint256 amountForLongX,
-        uint256 amountForShortX,
-        uint256 amountForLongY,
-        uint256 amountForShortY
+        uint128 amountForLongX,
+        uint128 amountForShortX,
+        uint128 amountForLongY,
+        uint128 amountForShortY
     ) external;
 }
