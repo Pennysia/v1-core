@@ -155,8 +155,8 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             _mint(address(0), pairId, million, million, million, million); // intial ratio 1:1000
             emit Mint(callback, address(0), pairId, 1000000, 1000000);
 
-            balance0 = 2000;
-            balance1 = 2000;
+            balance0 += 2000;
+            balance1 += 2000;
             require(
                 amount0Long >= reserve0Long && amount0Short >= reserve0Short && amount1Long >= reserve1Long
                     && amount1Short >= reserve1Short,
@@ -292,36 +292,6 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         emit Burn(callback, to, pairId, amount0, amount1);
     }
 
-    function _updatePair(
-        uint256 pairId,
-        uint256 reserve0Long,
-        uint256 reserve0Short,
-        uint256 reserve1Long,
-        uint256 reserve1Short
-    ) private {
-        uint256 reserve0Total = reserve0Long + reserve0Short;
-        uint256 reserve1Total = reserve1Long + reserve1Short;
-        uint64 blockTimestamp = uint64(block.timestamp); // won't overflow until the year 292 billion AD.
-        uint64 timeElasped = blockTimestamp - pairs[pairId].blockTimestampLast;
-        if (timeElasped > 0) {
-            uint256 priceX128 = Math.fullMulDiv(reserve1Total, SCALE, reserve0Total);
-            uint256 cbrtPriceX128 = Math.cbrt(priceX128);
-            pairs[pairId].cbrtPriceX128CumulativeLast += uint192(cbrtPriceX128 * timeElasped); // won't overflow
-        }
-        pairs[pairId].blockTimestampLast = blockTimestamp;
-
-        require(reserve0Long > 0 && reserve0Short > 0 && reserve1Long > 0 && reserve1Short > 0, minimumLiquidity());
-        pairs[pairId].reserve0Long = reserve0Long.safe128();
-        pairs[pairId].reserve0Short = reserve0Short.safe128();
-        pairs[pairId].reserve1Long = reserve1Long.safe128();
-        pairs[pairId].reserve1Short = reserve1Short.safe128();
-    }
-
-    function _updateBalance(address token0, address token1, uint256 balance0, uint256 balance1) private {
-        tokenBalances[token0] = balance0;
-        tokenBalances[token1] = balance1;
-    }
-
     // this low-level function should be called from a contract which performs important safety checks
     function swap(address to, address[] memory path, uint256 amount)
         external
@@ -357,7 +327,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             amountOut = reserveOut - newReserveOut;
 
             uint256 feeAmountOut = Math.divUp(amountOut * FEE, 1000); // won't overflow
-            uint256 feeAmountIn = Math.fullMulDivUp(amountIn[0], feeAmountOut, amountOut);
+            uint256 feeAmountIn = Math.divUp(amountIn[0] * FEE, 1000); // won't overflow
 
             if (zeroForOne) {
                 reserve1Long = Math.fullMulDiv(reserve1Long, newReserveOut, reserveOut);
@@ -401,5 +371,35 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         TransferHelper.safeTransfer(path[length - 1], to, amountOut); // transfer the output token to the user
 
         emit Swap(callback, to, path[0], path[length - 1], amount, amountOut);
+    }
+
+    function _updatePair(
+        uint256 pairId,
+        uint256 reserve0Long,
+        uint256 reserve0Short,
+        uint256 reserve1Long,
+        uint256 reserve1Short
+    ) private {
+        uint256 reserve0Total = reserve0Long + reserve0Short;
+        uint256 reserve1Total = reserve1Long + reserve1Short;
+        uint64 blockTimestamp = uint64(block.timestamp); // won't overflow until the year 292 billion AD.
+        uint64 timeElasped = blockTimestamp - pairs[pairId].blockTimestampLast;
+        if (timeElasped > 0) {
+            uint256 priceX128 = Math.fullMulDiv(reserve1Total, SCALE, reserve0Total);
+            uint256 cbrtPriceX128 = Math.cbrt(priceX128);
+            pairs[pairId].cbrtPriceX128CumulativeLast += uint192(cbrtPriceX128 * timeElasped); // won't overflow
+        }
+        pairs[pairId].blockTimestampLast = blockTimestamp;
+
+        require(reserve0Long > 0 && reserve0Short > 0 && reserve1Long > 0 && reserve1Short > 0, minimumLiquidity());
+        pairs[pairId].reserve0Long = reserve0Long.safe128();
+        pairs[pairId].reserve0Short = reserve0Short.safe128();
+        pairs[pairId].reserve1Long = reserve1Long.safe128();
+        pairs[pairId].reserve1Short = reserve1Short.safe128();
+    }
+
+    function _updateBalance(address token0, address token1, uint256 balance0, uint256 balance1) private {
+        tokenBalances[token0] = balance0;
+        tokenBalances[token1] = balance1;
     }
 }
