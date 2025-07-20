@@ -335,8 +335,8 @@ contract MarketTest is Test {
     function test_FlashSingleToken() public {
         address token = address(new MockERC20());
         MockERC20 mockToken = MockERC20(token);
-        uint256 expectedFee = Math.divUp(500, 1000); // 1
-        uint256 expectedPayback = 500 + expectedFee; // 501
+        uint256 expectedFee = Math.fullMulDivUp(500, 3, 1000); // 0.3% fee = 2
+        uint256 expectedPayback = 500 + expectedFee; // 502
         // Set Market balance to at least the flash amount
         mockToken.setBalance(address(market), 500);
 
@@ -368,8 +368,8 @@ contract MarketTest is Test {
         address token2 = address(new MockERC20());
         MockERC20 mockToken1 = MockERC20(token1);
         MockERC20 mockToken2 = MockERC20(token2);
-        uint256 fee1 = Math.divUp(300, 1000); // 1
-        uint256 fee2 = Math.divUp(600, 1000); // 1
+        uint256 fee1 = Math.fullMulDivUp(300, 3, 1000); // 0.3% fee = 1
+        uint256 fee2 = Math.fullMulDivUp(600, 3, 1000); // 0.3% fee = 2
         uint256 payback1 = 300 + fee1;
         uint256 payback2 = 600 + fee2;
         // Set Market balances to at least the flash amounts
@@ -412,7 +412,7 @@ contract MarketTest is Test {
         vm.assume(amount > 0 && amount < type(uint256).max / 1000);
         address token = address(new MockERC20());
         MockERC20 mockToken = MockERC20(token);
-        uint256 expectedFee = Math.divUp(amount, 1000);
+        uint256 expectedFee = Math.fullMulDivUp(amount, 3, 1000);
         uint256 payback = amount + expectedFee;
         // Set Market balance to at least the flash amount
         mockToken.setBalance(address(market), amount);

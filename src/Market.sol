@@ -91,7 +91,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         uint256[] memory balancesBefore = new uint256[](length);
 
         for (uint256 i; i < length; i++) {
-            paybackAmounts[i] = amounts[i] + Math.divUp(amounts[i], 1000); // include 0.1% fee (10 bps)
+            paybackAmounts[i] = Math.fullMulDivUp(amounts[i], 1003, 1000);// include 0.3% fee (30 bps)
             TransferHelper.safeTransfer(tokens[i], to, amounts[i]);
             balancesBefore[i] = PairLibrary.getBalance(tokens[i]);
         }
