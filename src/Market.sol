@@ -166,6 +166,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             amount0Short -= reserve0Short;
             amount1Long -= reserve1Long;
             amount1Short -= reserve1Short;
+            emit Create(token0, token1, pairId);
         } else {
             reserve0Long = pairs[pairId].reserve0Long;
             reserve0Short = pairs[pairId].reserve0Short;
@@ -207,7 +208,6 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             liquidity1Long.safe128(),
             liquidity1Short.safe128()
         );
-        emit Create(token0, token1, pairId);
         emit Mint(callback, to, pairId, totalAmount0, totalAmount1);
     }
 
