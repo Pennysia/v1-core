@@ -3,6 +3,8 @@
 pragma solidity 0.8.28;
 
 interface IMarket {
+    error forbidden();
+
     struct Pair {
         uint128 reserve0Long;
         uint128 reserve0Short;
