@@ -26,9 +26,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
     /// @notice Tracks the timestamp-based allowances for token transfers
     /// @dev Uses block.timestamp as the approval metric. A timestamp greater than current block.timestamp indicates an active approval.
     ///      This implements a TTL (Time-To-Live) based approval system where approvals automatically expire.
-    mapping(address => mapping(address => mapping(uint256 => uint256)))
-        public
-        override allowance;
+    mapping(address => mapping(address => mapping(uint256 => uint256))) public override allowance;
 
     /// @notice Mapping of account addresses with poolId to their nonces for permit functionality
     mapping(address => mapping(uint256 => uint256)) public override nonces;
@@ -69,9 +67,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
     }
 
     /// @notice Returns the total supply of LP tokens
-    function totalSupply(
-        uint256 poolId
-    )
+    function totalSupply(uint256 poolId)
         public
         view
         override
@@ -85,10 +81,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
         );
     }
 
-    function balanceOf(
-        address account,
-        uint256 poolId
-    )
+    function balanceOf(address account, uint256 poolId)
         public
         view
         override
@@ -103,11 +96,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
     }
 
     /// @notice Approves or revokes permission for a spender to transfer tokens
-    function approve(
-        address spender,
-        uint256 poolId,
-        uint256 value
-    ) public override returns (bool) {
+    function approve(address spender, uint256 poolId, uint256 value) public override returns (bool) {
         address owner = msg.sender;
         allowance[owner][spender][poolId] = value;
         emit Approval(owner, spender, poolId, value);
@@ -116,14 +105,10 @@ abstract contract Liquidity is ILiquidity, Deadline {
 
     /// @notice Transfers LP tokens to another address
     /// @dev if 'to' is the address(0), it will burn the tokens instead of transferring.
-    function transfer(
-        address to,
-        uint256 poolId,
-        uint128 longX,
-        uint128 shortX,
-        uint128 longY,
-        uint128 shortY
-    ) public returns (bool) {
+    function transfer(address to, uint256 poolId, uint128 longX, uint128 shortX, uint128 longY, uint128 shortY)
+        public
+        returns (bool)
+    {
         require(to != address(this), InvalidAddress());
         if (to != address(0)) {
             LpInfo storage lpInfo_from = _balances[msg.sender][poolId];
@@ -160,10 +145,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
         uint128 shortY
     ) public returns (bool) {
         require(to != address(this), InvalidAddress());
-        require(
-            allowance[from][msg.sender][poolId] >= block.timestamp,
-            InsufficientAllowance()
-        );
+        require(allowance[from][msg.sender][poolId] >= block.timestamp, InsufficientAllowance());
         if (to != address(0)) {
             LpInfo storage lpInfo_from = _balances[from][poolId];
             lpInfo_from.longX -= longX;
@@ -231,10 +213,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
                 s
             );
 
-            require(
-                recoveredAddress != address(0) && recoveredAddress == owner,
-                InvalidAddress()
-            );
+            require(recoveredAddress != address(0) && recoveredAddress == owner, InvalidAddress());
             allowance[owner][spender][poolId] = value;
         }
 
@@ -244,24 +223,20 @@ abstract contract Liquidity is ILiquidity, Deadline {
 
     /// @notice Returns the domain separator used in the permit signature
     function DOMAIN_SEPARATOR() public view override returns (bytes32) {
-        return
-            block.chainid == INITIAL_CHAIN_ID
-                ? INITIAL_DOMAIN_SEPARATOR
-                : computeDomainSeparator();
+        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
     }
 
     /// @notice Computes the domain separator for permit functionality
     function computeDomainSeparator() private view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f, //keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-                    0x8485c8f9ff1831604071989682a90eadc69f950358057c3b4a600e0942b750fa, //keccak256(bytes(name))
-                    0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6, //keccak256("1")
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(
+            abi.encode(
+                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f, //keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+                0x8485c8f9ff1831604071989682a90eadc69f950358057c3b4a600e0942b750fa, //keccak256(bytes(name))
+                0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6, //keccak256("1")
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -269,14 +244,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Mints new LP tokens to an address
-    function _mint(
-        address to,
-        uint256 poolId,
-        uint128 longX,
-        uint128 shortX,
-        uint128 longY,
-        uint128 shortY
-    ) internal {
+    function _mint(address to, uint256 poolId, uint128 longX, uint128 shortX, uint128 longY, uint128 shortY) internal {
         LpInfo storage lpInfo_total = _totalSupply[poolId];
         lpInfo_total.longX += longX;
         lpInfo_total.shortX += shortX;
@@ -297,14 +265,9 @@ abstract contract Liquidity is ILiquidity, Deadline {
     }
 
     /// @notice Burns LP tokens from an address
-    function _burn(
-        address from,
-        uint256 poolId,
-        uint128 longX,
-        uint128 shortX,
-        uint128 longY,
-        uint128 shortY
-    ) internal {
+    function _burn(address from, uint256 poolId, uint128 longX, uint128 shortX, uint128 longY, uint128 shortY)
+        internal
+    {
         LpInfo storage lpInfo_bal = _balances[from][poolId];
         lpInfo_bal.longX -= longX;
         lpInfo_bal.shortX -= shortX;
