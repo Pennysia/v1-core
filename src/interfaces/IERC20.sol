@@ -13,19 +13,13 @@ interface IERC20 {
     /// @param recipient The account that will receive the amount transferred
     /// @param amount The number of tokens to send from the sender to the recipient
     /// @return Returns true for a successful transfer, false for an unsuccessful transfer
-    function transfer(
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
 
     /// @notice Returns the current allowance given to a spender by an owner
     /// @param owner The account of the token owner
     /// @param spender The account of the token spender
     /// @return The current allowance granted by `owner` to `spender`
-    function allowance(
-        address owner,
-        address spender
-    ) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
 
     /// @notice Sets the allowance of a spender from the `msg.sender` to the value `amount`
     /// @param spender The account which will be allowed to spend a given amount of the owners tokens
@@ -38,9 +32,5 @@ interface IERC20 {
     /// @param recipient The recipient of the transfer
     /// @param amount The amount of the transfer
     /// @return Returns true for a successful transfer, false for unsuccessful
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 }
