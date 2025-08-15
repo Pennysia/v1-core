@@ -8,6 +8,7 @@ import {Validation} from "./libraries/Validation.sol";
 import {PairLibrary} from "./libraries/PairLibrary.sol";
 import {Math} from "./libraries/Math.sol";
 import {Callback} from "./libraries/Callback.sol";
+import {TransferHelper} from "./libraries/TransferHelper.sol";
 
 contract Market is IMarket, Liquidity {
     using SafeCast for uint256;
@@ -29,15 +30,26 @@ contract Market is IMarket, Liquidity {
         owner = _owner;
     }
 
-    function getPairId(address token0, address token1) public pure returns (uint256 pairId) {
+    function getPairId(
+        address token0,
+        address token1
+    ) public pure returns (uint256 pairId) {
         Validation.checkTokenOrder(token0, token1);
         pairId = PairLibrary.computePairId(token0, token1);
     }
 
-    function getReserves(address token0, address token1)
+    function getReserves(
+        address token0,
+        address token1
+    )
         public
         view
-        returns (uint128 reserve0Long, uint128 reserve0Short, uint128 reserve1Long, uint128 reserve1Short)
+        returns (
+            uint128 reserve0Long,
+            uint128 reserve0Short,
+            uint128 reserve1Long,
+            uint128 reserve1Short
+        )
     {
         Validation.checkTokenOrder(token0, token1);
         uint256 pairId = PairLibrary.computePairId(token0, token1);
@@ -107,8 +119,10 @@ contract Market is IMarket, Liquidity {
             balance0 += 2000;
             balance1 += 2000;
             require(
-                amount0Long >= reserve0Long && amount0Short >= reserve0Short && amount1Long >= reserve1Long
-                    && amount1Short >= reserve1Short,
+                amount0Long >= reserve0Long &&
+                    amount0Short >= reserve0Short &&
+                    amount1Long >= reserve1Long &&
+                    amount1Short >= reserve1Short,
                 minimumLiquidity()
             );
             amount0Long -= reserve0Long;
@@ -126,19 +140,35 @@ contract Market is IMarket, Liquidity {
         LpInfo storage lpInfo = _totalSupply[pairId];
 
         if (amount0Long > 0) {
-            liquidity0Long = Math.fullMulDiv(amount0Long, lpInfo.longX, reserve0Long);
+            liquidity0Long = Math.fullMulDiv(
+                amount0Long,
+                lpInfo.longX,
+                reserve0Long
+            );
             reserve0Long += amount0Long;
         }
         if (amount0Short > 0) {
-            liquidity0Short = Math.fullMulDiv(amount0Short, lpInfo.shortX, reserve0Short);
+            liquidity0Short = Math.fullMulDiv(
+                amount0Short,
+                lpInfo.shortX,
+                reserve0Short
+            );
             reserve0Short += amount0Short;
         }
         if (amount1Long > 0) {
-            liquidity1Long = Math.fullMulDiv(amount1Long, lpInfo.longY, reserve1Long);
+            liquidity1Long = Math.fullMulDiv(
+                amount1Long,
+                lpInfo.longY,
+                reserve1Long
+            );
             reserve1Long += amount1Long;
         }
         if (amount1Short > 0) {
-            liquidity1Short = Math.fullMulDiv(amount1Short, lpInfo.shortY, reserve1Short);
+            liquidity1Short = Math.fullMulDiv(
+                amount1Short,
+                lpInfo.shortY,
+                reserve1Short
+            );
             reserve1Short += amount1Short;
         }
 
@@ -147,7 +177,13 @@ contract Market is IMarket, Liquidity {
         balance0 += totalAmount0;
         balance1 += totalAmount1;
 
-        _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
+        _updatePair(
+            pairId,
+            reserve0Long,
+            reserve0Short,
+            reserve1Long,
+            reserve1Short
+        );
         _updateBalance(token0, token1, balance0, balance1);
         _mint(
             to,
@@ -158,6 +194,121 @@ contract Market is IMarket, Liquidity {
             liquidity1Short.safe128()
         );
         emit Mint(callback, to, pairId, totalAmount0, totalAmount1);
+    }
+
+    // this low-level function should be called from a contract which performs important safety checks
+    function withdrawLiquidity(
+        address to,
+        address token0,
+        address token1,
+        uint256 liquidity0Long,
+        uint256 liquidity0Short,
+        uint256 liquidity1Long,
+        uint256 liquidity1Short
+    ) external returns (uint256 pairId, uint256 amount0, uint256 amount1) {
+        address callback = msg.sender;
+        Validation.notThis(to);
+        Validation.checkTokenOrder(token0, token1);
+        pairId = PairLibrary.computePairId(token0, token1);
+        require(pairs[pairId].reserve0Long > 0, pairNotFound());
+        LpInfo memory lpInfo = _totalSupply[pairId];
+
+        //request payment
+        Callback.liquidityCallback(
+            callback,
+            to,
+            pairId,
+            liquidity0Long.safe128(),
+            liquidity0Short.safe128(),
+            liquidity1Long.safe128(),
+            liquidity1Short.safe128(),
+            lpInfo
+        );
+
+        uint256 reserve0Long = pairs[pairId].reserve0Long;
+        uint256 reserve0Short = pairs[pairId].reserve0Short;
+        uint256 reserve1Long = pairs[pairId].reserve1Long;
+        uint256 reserve1Short = pairs[pairId].reserve1Short;
+
+        uint256 fee0Long;
+        uint256 fee0Short;
+        uint256 fee1Long;
+        uint256 fee1Short;
+
+        uint256 amountOut;
+
+        if (liquidity0Long > 0) {
+            fee0Long = Math.divUp(liquidity0Long * FEE, 1000); // won't overflow because liquidity0Long is uint128
+            amountOut = Math.fullMulDiv(
+                liquidity0Long - fee0Long,
+                reserve0Long,
+                lpInfo.longX
+            );
+            amount0 += amountOut;
+            reserve0Long -= amountOut;
+            fee0Long = (fee0Long * 20) / 100;
+        }
+        if (liquidity0Short > 0) {
+            fee0Short = Math.divUp(liquidity0Short * FEE, 1000); // won't overflow
+            amountOut = Math.fullMulDiv(
+                liquidity0Short - fee0Short,
+                reserve0Short,
+                lpInfo.shortX
+            );
+            amount0 += amountOut;
+            reserve0Short -= amountOut;
+            fee0Short = (fee0Short * 20) / 100;
+        }
+        if (liquidity1Long > 0) {
+            fee1Long = Math.divUp(liquidity1Long * FEE, 1000); // won't overflow
+            amountOut = Math.fullMulDiv(
+                liquidity1Long - fee1Long,
+                reserve1Long,
+                lpInfo.longY
+            );
+            amount1 += amountOut;
+            reserve1Long -= amountOut;
+            fee1Long = (fee1Long * 20) / 100;
+        }
+        if (liquidity1Short > 0) {
+            fee1Short = Math.divUp(liquidity1Short * FEE, 1000); // won't overflow
+            amountOut = Math.fullMulDiv(
+                liquidity1Short - fee1Short,
+                reserve1Short,
+                lpInfo.shortY
+            );
+            amount1 += amountOut;
+            reserve1Short -= amountOut;
+            fee1Short = (fee1Short * 20) / 100;
+        }
+
+        _updatePair(
+            pairId,
+            reserve0Long,
+            reserve0Short,
+            reserve1Long,
+            reserve1Short
+        );
+        _updateBalance(
+            token0,
+            token1,
+            tokenBalances[token0] - amount0,
+            tokenBalances[token1] - amount1
+        );
+
+        // mint 20% of fees to the protocol as reserve and protocol fees
+        _mint(
+            address(this),
+            pairId,
+            fee0Long.safe128(),
+            fee0Short.safe128(),
+            fee1Long.safe128(),
+            fee1Short.safe128()
+        );
+
+        TransferHelper.safeTransfer(token0, to, amount0);
+        TransferHelper.safeTransfer(token1, to, amount1);
+        emit Burn(callback, to, pairId, amount0, amount1);
     }
 
     function _updatePair(
@@ -172,20 +323,37 @@ contract Market is IMarket, Liquidity {
         uint64 blockTimestamp = uint64(block.timestamp); // won't overflow until the year 292 billion AD.
         uint64 timeElasped = blockTimestamp - pairs[pairId].blockTimestampLast;
         if (timeElasped > 0) {
-            uint256 priceX128 = Math.fullMulDiv(reserve1Total, SCALE, reserve0Total);
+            uint256 priceX128 = Math.fullMulDiv(
+                reserve1Total,
+                SCALE,
+                reserve0Total
+            );
             uint256 cbrtPriceX128 = Math.cbrt(priceX128);
-            pairs[pairId].cbrtPriceX128CumulativeLast += uint192(cbrtPriceX128 * timeElasped); // won't overflow
+            pairs[pairId].cbrtPriceX128CumulativeLast += uint192(
+                cbrtPriceX128 * timeElasped
+            ); // won't overflow
         }
         pairs[pairId].blockTimestampLast = blockTimestamp;
 
-        require(reserve0Long > 0 && reserve0Short > 0 && reserve1Long > 0 && reserve1Short > 0, minimumLiquidity());
+        require(
+            reserve0Long > 0 &&
+                reserve0Short > 0 &&
+                reserve1Long > 0 &&
+                reserve1Short > 0,
+            minimumLiquidity()
+        );
         pairs[pairId].reserve0Long = reserve0Long.safe128();
         pairs[pairId].reserve0Short = reserve0Short.safe128();
         pairs[pairId].reserve1Long = reserve1Long.safe128();
         pairs[pairId].reserve1Short = reserve1Short.safe128();
     }
 
-    function _updateBalance(address token0, address token1, uint256 balance0, uint256 balance1) private {
+    function _updateBalance(
+        address token0,
+        address token1,
+        uint256 balance0,
+        uint256 balance1
+    ) private {
         tokenBalances[token0] = balance0;
         tokenBalances[token1] = balance1;
     }
