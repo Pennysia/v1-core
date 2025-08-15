@@ -20,8 +20,54 @@ library Callback {
 
         // Verify payback amounts for each token
         for (uint256 i = 0; i < len; i++) {
-            uint256 paid = PairLibrary.getBalance(tokens[i]) - balancesBefore[i];
+            uint256 paid = PairLibrary.getBalance(tokens[i]) -
+                balancesBefore[i];
             require(paid >= paybackAmounts[i], InsufficientPayback());
         }
+    }
+
+    function liquidityCallback(
+        address caller,
+        address to,
+        uint256 poolId,
+        uint128 amountLongX,
+        uint128 amountShortX,
+        uint128 amountLongY,
+        uint128 amountShortY,
+        ILiquidity.LpInfo memory lpInfoBefore
+    ) internal {
+        ILiquidity lpContract = ILiquidity(address(this));
+        IPayment(caller).requestLiquidity(
+            to,
+            poolId,
+            amountLongX,
+            amountShortX,
+            amountLongY,
+            amountShortY
+        ); // user paybacks
+
+        (
+            uint128 longXAfter,
+            uint128 shortXAfter,
+            uint128 longYAfter,
+            uint128 shortYAfter
+        ) = lpContract.totalSupply(poolId);
+
+        require(
+            longXAfter <= lpInfoBefore.longX - amountLongX,
+            InsufficientPayback()
+        );
+        require(
+            shortXAfter <= lpInfoBefore.shortX - amountShortX,
+            InsufficientPayback()
+        );
+        require(
+            longYAfter <= lpInfoBefore.longY - amountLongY,
+            InsufficientPayback()
+        );
+        require(
+            shortYAfter <= lpInfoBefore.shortY - amountShortY,
+            InsufficientPayback()
+        );
     }
 }
