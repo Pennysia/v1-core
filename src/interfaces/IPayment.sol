@@ -7,11 +7,7 @@ pragma solidity 0.8.28;
 interface IPayment {
     /// @notice this is used in createLiquidity, flash, and swap
     /// the caller need to pays specific amounts of tokens to the Market contract.
-    function requestToken(
-        address to,
-        address[] memory tokens,
-        uint256[] memory paybackAmounts
-    ) external payable;
+    function requestToken(address to, address[] memory tokens, uint256[] memory paybackAmounts) external payable;
 
     /// @notice this is used in burn
     /// the caller need to pays specific amounts of liquidity tokens by transferring them to address(0).
