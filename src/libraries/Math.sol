@@ -10,11 +10,7 @@ library Math {
     /// @dev Calculates `floor(x * y / d)` with full precision.
     /// Throws if result overflows a uint256 or when `d` is zero.
     /// Credit to Remco Bloemen under MIT license: https://2π.com/21/muldiv
-    function fullMulDiv(
-        uint256 x,
-        uint256 y,
-        uint256 d
-    ) internal pure returns (uint256 z) {
+    function fullMulDiv(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
         /// @solidity memory-safe-assembly
         assembly {
             // 512-bit multiply `[p1 p0] = x * y`.
@@ -25,11 +21,7 @@ library Math {
 
             // Temporarily use `z` as `p0` to save gas.
             z := mul(x, y) // Lower 256 bits of `x * y`.
-            for {
-
-            } 1 {
-
-            } {
+            for {} 1 {} {
                 // If overflows.
                 if iszero(mul(or(iszero(x), eq(div(z, x), y)), d)) {
                     let mm := mulmod(x, y, not(0))
@@ -61,20 +53,36 @@ library Math {
                     inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**32
                     inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**64
                     inv := mul(inv, sub(2, mul(d, inv))) // inverse mod 2**128
-                    z := mul(
-                        // Divide [p1 p0] by the factors of two.
-                        // Shift in bits from `p1` into `p0`. For this we need
-                        // to flip `t` such that it is `2**256 / t`.
-                        or(
-                            mul(sub(p1, gt(r, z)), add(div(sub(0, t), t), 1)),
-                            div(sub(z, r), t)
-                        ),
-                        mul(sub(2, mul(d, inv)), inv) // inverse mod 2**256
-                    )
+                    z :=
+                        mul(
+                            // Divide [p1 p0] by the factors of two.
+                            // Shift in bits from `p1` into `p0`. For this we need
+                            // to flip `t` such that it is `2**256 / t`.
+                            or(mul(sub(p1, gt(r, z)), add(div(sub(0, t), t), 1)), div(sub(z, r), t)),
+                            mul(sub(2, mul(d, inv)), inv) // inverse mod 2**256
+                        )
                     break
                 }
                 z := div(z, d)
                 break
+            }
+        }
+    }
+
+    /// @dev Calculates `floor(x * y / d)` with full precision, rounded up.
+    /// Throws if result overflows a uint256 or when `d` is zero.
+    /// Credit to Uniswap-v3-core under MIT license:
+    /// https://github.com/Uniswap/v3-core/blob/main/contracts/libraries/FullMath.sol
+    function fullMulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
+        z = fullMulDiv(x, y, d);
+        /// @solidity memory-safe-assembly
+        assembly {
+            if mulmod(x, y, d) {
+                z := add(z, 1)
+                if iszero(z) {
+                    mstore(0x00, 0xae47f702) // `FullMulDivFailed()`.
+                    revert(0x1c, 0x04)
+                }
             }
         }
     }
@@ -106,10 +114,7 @@ library Math {
             r := or(r, shl(4, lt(0xffff, shr(r, x))))
             r := or(r, shl(3, lt(0xff, shr(r, x))))
             // Makeshift lookup table to nudge the approximate log2 result.
-            z := div(
-                shl(div(r, 3), shl(lt(0xf, shr(r, x)), 0xf)),
-                xor(7, mod(r, 3))
-            )
+            z := div(shl(div(r, 3), shl(lt(0xf, shr(r, x)), 0xf)), xor(7, mod(r, 3)))
             // Newton-Raphson's.
             z := div(add(add(div(x, mul(z, z)), z), z), 3)
             z := div(add(add(div(x, mul(z, z)), z), z), 3)
