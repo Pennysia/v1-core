@@ -13,6 +13,7 @@ library Math {
     function fullMulDiv(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
         /// @solidity memory-safe-assembly
         assembly {
+            // Performs 512-bit multiplication and division using Chinese Remainder Theorem for precision.
             // 512-bit multiply `[p1 p0] = x * y`.
             // Compute the product mod `2**256` and mod `2**256 - 1`
             // then use the Chinese Remainder Theorem to reconstruct
@@ -74,6 +75,7 @@ library Math {
     /// Credit to Uniswap-v3-core under MIT license:
     /// https://github.com/Uniswap/v3-core/blob/main/contracts/libraries/FullMath.sol
     function fullMulDivUp(uint256 x, uint256 y, uint256 d) internal pure returns (uint256 z) {
+        // Computes floored result and adds 1 if there's a remainder.
         z = fullMulDiv(x, y, d);
         /// @solidity memory-safe-assembly
         assembly {
@@ -92,6 +94,7 @@ library Math {
     function divUp(uint256 x, uint256 d) internal pure returns (uint256 z) {
         /// @solidity memory-safe-assembly
         assembly {
+            // Efficient ceiling division.
             if iszero(d) {
                 mstore(0x00, 0x65244e4e) // `DivFailed()`.
                 revert(0x1c, 0x04)
@@ -108,6 +111,7 @@ library Math {
     function cbrt(uint256 x) internal pure returns (uint256 z) {
         /// @solidity memory-safe-assembly
         assembly {
+            // Approximates log2, then uses Newton-Raphson iterations for precision.
             let r := shl(7, lt(0xffffffffffffffffffffffffffffffff, x))
             r := or(r, shl(6, lt(0xffffffffffffffff, shr(r, x))))
             r := or(r, shl(5, lt(0xffffffff, shr(r, x))))
