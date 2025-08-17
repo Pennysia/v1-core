@@ -20,7 +20,7 @@ contract MathTest is Test {
         assertEq(result, type(uint128).max, "fullMulDiv should handle max uint128 values");
     }
 
-    function test_FullMulDivRevertsOnZeroDenominator() public {
+    function test_FullMulDivRevertsOnZeroDenominator() public view {
         // Test that fullMulDiv reverts on zero denominator
         bool reverted = false;
         try this.callFullMulDiv(100, 200, 0) {
@@ -35,7 +35,7 @@ contract MathTest is Test {
         return Math.fullMulDiv(x, y, d);
     }
 
-    function test_FullMulDivRevertsOnOverflow() public {
+    function test_FullMulDivRevertsOnOverflow() public view {
         // Test overflow scenario
         bool reverted = false;
         try this.callFullMulDiv(type(uint256).max, type(uint256).max, 1) {
@@ -73,7 +73,7 @@ contract MathTest is Test {
         assertTrue(result >= 392, "fullMulDivUp should round up from 392.15");
     }
 
-    function test_FullMulDivUpRevertsOnZeroDenominator() public {
+    function test_FullMulDivUpRevertsOnZeroDenominator() public view {
         bool reverted = false;
         try this.callFullMulDivUp(100, 200, 0) {
             // Should not reach here
@@ -119,7 +119,7 @@ contract MathTest is Test {
         assertEq(result, 3, "divUp should round up 103 / 51 = 3");
     }
 
-    function test_DivUpRevertsOnZeroDenominator() public {
+    function test_DivUpRevertsOnZeroDenominator() public view {
         bool reverted = false;
         try this.callDivUp(100, 0) {
             // Should not reach here
