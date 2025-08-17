@@ -19,9 +19,12 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     uint8 private constant FEE = 3; // 0.3%
     uint256 private constant SCALE = 340282366920938463463374607431768211456; // 2**128
 
+    /// @notice The owner of the contract, with administrative privileges like setting new owner or sweeping excess tokens.
     address public override owner;
 
+    /// @notice Mapping of pair IDs to their reserve and oracle data.
     mapping(uint256 => Pair) public override pairs;
+    /// @notice Tracks the total reserved balance for each token across all pairs.
     mapping(address => uint256) public override tokenBalances;
 
     constructor(address _owner) {
@@ -30,16 +33,29 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
 
     receive() external payable {}
 
+    /// @notice Sets a new owner for the contract.
+    /// @param _owner The address of the new owner.
     function setOwner(address _owner) external override {
         require(msg.sender == owner, forbidden());
         owner = _owner;
     }
 
+    /// @notice Computes the unique ID for a token pair.
+    /// @param token0 First token address (must be less than token1).
+    /// @param token1 Second token address.
+    /// @return pairId The computed pair ID.
     function getPairId(address token0, address token1) public pure override returns (uint256 pairId) {
         Validation.checkTokenOrder(token0, token1);
         pairId = PairLibrary.computePairId(token0, token1);
     }
 
+    /// @notice Retrieves the long and short reserves for both tokens in a pair.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @return reserve0Long Long reserve of token0.
+    /// @return reserve0Short Short reserve of token0.
+    /// @return reserve1Long Long reserve of token1.
+    /// @return reserve1Short Short reserve of token1.
     function getReserves(address token0, address token1)
         public
         view
@@ -55,10 +71,17 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         reserve1Short = pairs[pairId].reserve1Short;
     }
 
+    /// @notice Calculates the amount of a token that can be swept (excess beyond reserved balance).
+    /// @param token The token address.
+    /// @return The sweepable amount.
     function getSweepable(address token) public view override returns (uint256) {
         return PairLibrary.getBalance(token) - tokenBalances[token];
     }
 
+    /// @notice Sweeps excess tokens to specified addresses (owner only).
+    /// @param tokens Array of token addresses to sweep.
+    /// @param amounts Array of amounts to sweep for each token.
+    /// @param to Array of recipient addresses for each sweep.
     function sweep(address[] calldata tokens, uint256[] calldata amounts, address[] calldata to)
         external
         override
@@ -76,6 +99,10 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         emit Sweep(msg.sender, to, tokens, amounts);
     }
 
+    /// @notice Executes a flash loan, requiring repayment with fee in the callback.
+    /// @param to Recipient of the loaned tokens.
+    /// @param tokens Array of tokens to loan.
+    /// @param amounts Array of amounts to loan for each token.
     function flash(address to, address[] calldata tokens, uint256[] calldata amounts)
         external
         override
@@ -101,7 +128,19 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         emit Flash(callback, to, tokens, amounts, paybackAmounts);
     }
 
-    // this low-level function should be called from a contract which performs important safety checks
+    /// @notice Creates or adds liquidity to a pair, minting LP tokens.
+    /// @param to Recipient of the LP tokens.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param amount0Long Amount added to token0 long reserve.
+    /// @param amount0Short Amount added to token0 short reserve.
+    /// @param amount1Long Amount added to token1 long reserve.
+    /// @param amount1Short Amount added to token1 short reserve.
+    /// @return pairId The pair ID.
+    /// @return liquidity0Long LP minted for token0 long.
+    /// @return liquidity0Short LP minted for token0 short.
+    /// @return liquidity1Long LP minted for token1 long.
+    /// @return liquidity1Short LP minted for token1 short.
     function createLiquidity(
         address to,
         address token0,
@@ -147,6 +186,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         uint256 balance0 = tokenBalances[token0];
         uint256 balance1 = tokenBalances[token1];
 
+        // For new pairs, initialize minimal reserves and mint initial LP to address(0) for locking.
         if (pairs[pairId].reserve0Long == 0) {
             reserve0Long = 1000;
             reserve0Short = 1000;
@@ -175,6 +215,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             reserve1Short = pairs[pairId].reserve1Short;
         }
 
+        // Calculate LP shares for each position type.
         LpInfo storage lpInfo = _totalSupply[pairId];
 
         if (amount0Long > 0) {
@@ -199,8 +240,10 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         balance0 += totalAmount0;
         balance1 += totalAmount1;
 
+        // Update reserves and balances.
         _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
         _updateBalance(token0, token1, balance0, balance1);
+        // Mint LP tokens.
         _mint(
             to,
             pairId,
@@ -212,7 +255,17 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         emit Mint(callback, to, pairId, totalAmount0, totalAmount1);
     }
 
-    // this low-level function should be called from a contract which performs important safety checks
+    /// @notice Withdraws liquidity, burning LP tokens and applying exit fees.
+    /// @param to Recipient of the withdrawn tokens.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param liquidity0Long LP to burn from token0 long.
+    /// @param liquidity0Short LP to burn from token0 short.
+    /// @param liquidity1Long LP to burn from token1 long.
+    /// @param liquidity1Short LP to burn from token1 short.
+    /// @return pairId The pair ID.
+    /// @return amount0 Total token0 withdrawn.
+    /// @return amount1 Total token1 withdrawn.
     function withdrawLiquidity(
         address to,
         address token0,
@@ -253,6 +306,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
 
         uint256 amountOut;
 
+        // Calculate exit fees and amounts out for each position.
         if (liquidity0Long > 0) {
             fee0Long = Math.divUp(liquidity0Long * FEE, 1000); // won't overflow because liquidity0Long is uint128
             amountOut = Math.fullMulDiv(liquidity0Long - fee0Long, reserve0Long, lpInfo.longX);
@@ -282,18 +336,24 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             fee1Short = (fee1Short * 20) / 100;
         }
 
+        // Update reserves and balances.
         _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
         _updateBalance(token0, token1, tokenBalances[token0] - amount0, tokenBalances[token1] - amount1);
 
-        // mint 20% of fees to the protocol as reserve and protocol fees
+        // Mint protocol share of fees as LP.
         _mint(address(this), pairId, fee0Long.safe128(), fee0Short.safe128(), fee1Long.safe128(), fee1Short.safe128());
 
+        // Transfer withdrawn tokens.
         TransferHelper.safeTransfer(token0, to, amount0);
         TransferHelper.safeTransfer(token1, to, amount1);
         emit Burn(callback, to, pairId, amount0, amount1);
     }
 
-    // this low-level function should be called from a contract which performs important safety checks
+    /// @notice Performs a multi-hop swap along the given path.
+    /// @param to Recipient of the output tokens.
+    /// @param path Array of tokens defining the swap path.
+    /// @param amount Input amount.
+    /// @return amountOut Output amount received.
     function swap(address to, address[] memory path, uint256 amount)
         external
         nonReentrant
@@ -311,7 +371,9 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         address[] memory tokenIn = new address[](1);
         tokenIn[0] = path[0];
 
+        // For each hop in the path:
         for (uint256 i; i < length - 1; i++) {
+            // Determine direction and reserves.
             (address token0, address token1, bool zeroForOne) =
                 path[i] < path[i + 1] ? (path[i], path[i + 1], true) : (path[i + 1], path[i], false);
 
@@ -323,18 +385,22 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
 
             uint256 reserveIn = zeroForOne ? (reserve0Long + reserve0Short) : (reserve1Long + reserve1Short);
             uint256 reserveOut = zeroForOne ? (reserve1Long + reserve1Short) : (reserve0Long + reserve0Short);
+            // Compute new reserves using constant product formula.
             uint256 newReserveIn = reserveIn + amount;
             uint256 newReserveOut = Math.fullMulDiv(reserveOut, reserveIn, newReserveIn);
             amountOut = reserveOut - newReserveOut;
 
+            // Apply fees: adjust long/short splits.
             uint256 feeAmountOut = Math.divUp(amountOut * FEE, 1000); // won't overflow
             uint256 feeAmountIn = Math.divUp(amountIn[0] * FEE, 1000); // won't overflow
 
             if (zeroForOne) {
+                // Scale output reserves and add fee to long.
                 reserve1Long = Math.fullMulDiv(reserve1Long, newReserveOut, reserveOut);
                 reserve1Short = newReserveOut - reserve1Long;
                 reserve1Long += feeAmountOut; //100% fee goes to long positions of reserveOut
 
+                // Scale input reserves and move fee from long to short.
                 reserve0Long = Math.fullMulDiv(reserve0Long, newReserveIn, reserveIn);
                 reserve0Short = newReserveIn - reserve0Long;
                 if (reserve0Long > feeAmountIn) {
@@ -342,6 +408,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
                     reserve0Short += feeAmountIn;
                 }
             } else {
+                // Symmetric logic for the other direction.
                 reserve0Long = Math.fullMulDiv(reserve0Long, newReserveOut, reserveOut);
                 reserve0Short = newReserveOut - reserve0Long;
                 reserve0Long += feeAmountOut; //100% fee goes to long positions of reserveOut
@@ -374,6 +441,12 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         emit Swap(callback, to, path[0], path[length - 1], amount, amountOut);
     }
 
+    /// @dev Internal function to update pair reserves and cumulative oracle price.
+    /// @param pairId The pair ID.
+    /// @param reserve0Long Updated token0 long reserve.
+    /// @param reserve0Short Updated token0 short reserve.
+    /// @param reserve1Long Updated token1 long reserve.
+    /// @param reserve1Short Updated token1 short reserve.
     function _updatePair(
         uint256 pairId,
         uint256 reserve0Long,
@@ -385,6 +458,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         uint256 reserve1Total = reserve1Long + reserve1Short;
         uint64 blockTimestamp = uint64(block.timestamp); // won't overflow until the year 292 billion AD.
         uint64 timeElasped = blockTimestamp - pairs[pairId].blockTimestampLast;
+        // Update cumulative cube-root price for oracle.
         if (timeElasped > 0) {
             uint256 priceX128 = Math.fullMulDiv(reserve1Total, SCALE, reserve0Total);
             uint256 cbrtPriceX128 = Math.cbrt(priceX128);
@@ -399,6 +473,11 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         pairs[pairId].reserve1Short = reserve1Short.safe128();
     }
 
+    /// @dev Internal function to update token balances.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param balance0 New balance for token0.
+    /// @param balance1 New balance for token1.
     function _updateBalance(address token0, address token1, uint256 balance0, uint256 balance1) private {
         tokenBalances[token0] = balance0;
         tokenBalances[token1] = balance1;
