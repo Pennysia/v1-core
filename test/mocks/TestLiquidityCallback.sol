@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity 0.8.28;
 
 import {console} from "forge-std/console.sol";
@@ -53,11 +53,12 @@ contract TestLiquidityCallback is IPayment {
         console.log("transferFrom completed successfully");
     }
 
-    function requestToken(address, /*_to*/ address[] memory tokens, uint256[] memory amounts)
-        external
-        payable
-        override
-    {
+    function requestToken(
+        address,
+        /*_to*/
+        address[] memory tokens,
+        uint256[] memory amounts
+    ) external payable override {
         // Transfer tokens to the market contract
         for (uint256 i = 0; i < tokens.length; i++) {
             IERC20(tokens[i]).transfer(address(market), amounts[i]);
