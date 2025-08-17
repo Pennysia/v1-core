@@ -4,6 +4,8 @@
 
 An innovative Automated Market Maker (AMM) protocol featuring a unique **long/short liquidity model** for enhanced capital efficiency and liquidity provider incentives.
 
+This codebase implements a sophisticated AMM with position-based fee mechanics featuring a unique **long/short liquidity model**, aiming for better LP incentives (e.g., choose "long" for fee capture in output-heavy pairs).
+
 ## 🌟 Innovation: Long/Short Liquidity Model
 
 Unlike traditional AMMs that treat all liquidity equally, Pennysia splits token reserves into **"long"** and **"short"** positions with **directional rewards**:
