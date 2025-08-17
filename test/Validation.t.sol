@@ -14,7 +14,7 @@ contract ValidationTest is Test {
         Validation.checkTokenOrder(token0, token1);
     }
 
-    function test_CheckTokenOrderRevertsOnUnsorted() public {
+    function test_CheckTokenOrderRevertsOnUnsorted() public view {
         address token0 = address(0x2);
         address token1 = address(0x1);
 
@@ -27,7 +27,7 @@ contract ValidationTest is Test {
         assertTrue(reverted, "checkTokenOrder should revert when token0 >= token1");
     }
 
-    function test_CheckTokenOrderRevertsOnEqual() public {
+    function test_CheckTokenOrderRevertsOnEqual() public view {
         address token = address(0x1);
 
         bool reverted = false;
@@ -39,7 +39,7 @@ contract ValidationTest is Test {
         assertTrue(reverted, "checkTokenOrder should revert when tokens are equal");
     }
 
-    function test_CheckTokenOrderFuzz(address token0, address token1) public {
+    function test_CheckTokenOrderFuzz(address token0, address token1) public view {
         if (token0 < token1) {
             // Should not revert
             Validation.checkTokenOrder(token0, token1);
@@ -66,7 +66,7 @@ contract ValidationTest is Test {
         Validation.equalLengths(100, 100);
     }
 
-    function test_EqualLengthsRevertsOnMismatch() public {
+    function test_EqualLengthsRevertsOnMismatch() public view {
         bool reverted = false;
         try this.callEqualLengths(5, 3) {
             // Should not reach here
@@ -76,7 +76,7 @@ contract ValidationTest is Test {
         assertTrue(reverted, "equalLengths should revert on length mismatch");
     }
 
-    function test_EqualLengthsFuzz(uint256 length0, uint256 length1) public {
+    function test_EqualLengthsFuzz(uint256 length0, uint256 length1) public view {
         if (length0 == length1) {
             // Should not revert
             Validation.equalLengths(length0, length1);
@@ -102,7 +102,7 @@ contract ValidationTest is Test {
         Validation.notThis(other);
     }
 
-    function test_NotThisRevertsOnSelfAddress() public {
+    function test_NotThisRevertsOnSelfAddress() public view {
         bool reverted = false;
         try this.callNotThis(address(this)) {
             // Should not reach here
@@ -112,7 +112,7 @@ contract ValidationTest is Test {
         assertTrue(reverted, "notThis should revert when input is address(this)");
     }
 
-    function test_NotThisFuzz(address input) public {
+    function test_NotThisFuzz(address input) public view {
         if (input != address(this)) {
             // Should not revert
             Validation.notThis(input);
@@ -139,7 +139,7 @@ contract ValidationTest is Test {
         Validation.notZero(type(uint256).max);
     }
 
-    function test_NotZeroRevertsOnZero() public {
+    function test_NotZeroRevertsOnZero() public view {
         bool reverted = false;
         try this.callNotZero(0) {
             // Should not reach here
@@ -149,7 +149,7 @@ contract ValidationTest is Test {
         assertTrue(reverted, "notZero should revert when input is 0");
     }
 
-    function test_NotZeroFuzz(uint256 input) public {
+    function test_NotZeroFuzz(uint256 input) public view {
         if (input > 0) {
             // Should not revert
             Validation.notZero(input);
