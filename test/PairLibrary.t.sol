@@ -98,7 +98,7 @@ contract PairLibraryTest is Test {
         assertTrue(pairId1 != pairId2, "Similar addresses should produce different pair IDs");
     }
 
-    function test_ComputePairIdGasUsage() public {
+    function test_ComputePairIdGasUsage() public view {
         address token0 = address(0xA);
         address token1 = address(0xB);
 
