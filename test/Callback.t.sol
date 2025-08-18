@@ -15,36 +15,24 @@ contract MockERC20 is IERC20 {
         balanceOfMap[account] = amount;
     }
 
-    function balanceOf(
-        address account
-    ) external view override returns (uint256) {
+    function balanceOf(address account) external view override returns (uint256) {
         return balanceOfMap[account];
     }
 
-    function transfer(
-        address recipient,
-        uint256 amount
-    ) external override returns (bool) {
+    function transfer(address recipient, uint256 amount) external override returns (bool) {
         require(balanceOfMap[msg.sender] >= amount, "Insufficient balance");
         balanceOfMap[msg.sender] -= amount;
         balanceOfMap[recipient] += amount;
         return true;
     }
 
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external override returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) external override returns (bool) {
         balanceOfMap[sender] -= amount;
         balanceOfMap[recipient] += amount;
         return true;
     }
 
-    function allowance(
-        address,
-        address
-    ) external pure override returns (uint256) {
+    function allowance(address, address) external pure override returns (uint256) {
         return 0;
     }
 
@@ -61,11 +49,7 @@ contract MockPayment {
         shouldPayCorrectly = _shouldPayCorrectly;
     }
 
-    function requestToken(
-        address,
-        address[] memory tokens,
-        uint256[] memory paybackAmounts
-    ) external {
+    function requestToken(address, address[] memory tokens, uint256[] memory paybackAmounts) external {
         if (shouldPayCorrectly) {
             // Pay the correct amounts
             for (uint256 i = 0; i < tokens.length; i++) {
@@ -75,23 +59,13 @@ contract MockPayment {
             // Pay insufficient amounts (underpayment)
             for (uint256 i = 0; i < tokens.length; i++) {
                 if (paybackAmounts[i] > 0) {
-                    MockERC20(tokens[i]).transfer(
-                        msg.sender,
-                        paybackAmounts[i] - 1
-                    );
+                    MockERC20(tokens[i]).transfer(msg.sender, paybackAmounts[i] - 1);
                 }
             }
         }
     }
 
-    function requestLiquidity(
-        address,
-        uint256,
-        uint128,
-        uint128,
-        uint128,
-        uint128
-    ) external view {
+    function requestLiquidity(address, uint256, uint128, uint128, uint128, uint128) external view {
         // For liquidity callback, we need to simulate burning LP tokens
         // This would normally interact with the Market contract
         // For testing purposes, we'll just check if we should behave correctly
@@ -107,24 +81,11 @@ contract MockPayment {
 contract MockLiquidity {
     mapping(uint256 => ILiquidity.LpInfo) public totalSupply;
 
-    function setTotalSupply(
-        uint256 pairId,
-        uint128 longX,
-        uint128 shortX,
-        uint128 longY,
-        uint128 shortY
-    ) external {
-        totalSupply[pairId] = ILiquidity.LpInfo({
-            longX: longX,
-            shortX: shortX,
-            longY: longY,
-            shortY: shortY
-        });
+    function setTotalSupply(uint256 pairId, uint128 longX, uint128 shortX, uint128 longY, uint128 shortY) external {
+        totalSupply[pairId] = ILiquidity.LpInfo({longX: longX, shortX: shortX, longY: longY, shortY: shortY});
     }
 
-    function getTotalSupply(
-        uint256 pairId
-    ) external view returns (ILiquidity.LpInfo memory) {
+    function getTotalSupply(uint256 pairId) external view returns (ILiquidity.LpInfo memory) {
         return totalSupply[pairId];
     }
 }
@@ -162,20 +123,10 @@ contract CallbackTest is Test {
         balancesBefore[0] = token0.balanceOf(address(this));
 
         // Call tokenCallback
-        Callback.tokenCallback(
-            address(correctPayment),
-            address(0xDEF),
-            tokens,
-            balancesBefore,
-            amounts
-        );
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
 
         // Check that payment was made
-        assertEq(
-            token0.balanceOf(address(this)),
-            initialBalance + 1000,
-            "Should receive payment"
-        );
+        assertEq(token0.balanceOf(address(this)), initialBalance + 1000, "Should receive payment");
     }
 
     function test_TokenCallbackMultipleTokens() public {
@@ -200,25 +151,11 @@ contract CallbackTest is Test {
         balancesBefore[1] = token1.balanceOf(address(this));
 
         // Call tokenCallback
-        Callback.tokenCallback(
-            address(correctPayment),
-            address(0xDEF),
-            tokens,
-            balancesBefore,
-            amounts
-        );
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
 
         // Check that payments were made
-        assertEq(
-            token0.balanceOf(address(this)),
-            initialBalance0 + 1000,
-            "Should receive token0 payment"
-        );
-        assertEq(
-            token1.balanceOf(address(this)),
-            initialBalance1 + 2000,
-            "Should receive token1 payment"
-        );
+        assertEq(token0.balanceOf(address(this)), initialBalance0 + 1000, "Should receive token0 payment");
+        assertEq(token1.balanceOf(address(this)), initialBalance1 + 2000, "Should receive token1 payment");
     }
 
     function test_TokenCallbackRevertsOnUnderpayment() public {
@@ -241,12 +178,7 @@ contract CallbackTest is Test {
 
         // Should revert due to underpayment (pays back 999 instead of 1000)
         vm.expectRevert(Callback.InsufficientPayback.selector);
-        this.callTokenCallback(
-            address(underpayment),
-            tokens,
-            balancesBefore,
-            amounts
-        );
+        this.callTokenCallback(address(underpayment), tokens, balancesBefore, amounts);
     }
 
     function callTokenCallback(
@@ -255,13 +187,7 @@ contract CallbackTest is Test {
         uint256[] memory balancesBefore,
         uint256[] memory amounts
     ) external {
-        Callback.tokenCallback(
-            caller,
-            address(0xDEF),
-            tokens,
-            balancesBefore,
-            amounts
-        );
+        Callback.tokenCallback(caller, address(0xDEF), tokens, balancesBefore, amounts);
     }
 
     function test_TokenCallbackZeroAmount() public {
@@ -272,13 +198,7 @@ contract CallbackTest is Test {
         uint256[] memory balancesBefore = new uint256[](1);
         balancesBefore[0] = token0.balanceOf(address(this));
         // Should work with zero amounts
-        Callback.tokenCallback(
-            address(correctPayment),
-            address(0xDEF),
-            tokens,
-            balancesBefore,
-            amounts
-        );
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
     }
 
     function test_TokenCallbackFuzz(uint256 amount) public {
@@ -295,19 +215,9 @@ contract CallbackTest is Test {
         uint256[] memory balancesBefore = new uint256[](1);
         balancesBefore[0] = token0.balanceOf(address(this));
 
-        Callback.tokenCallback(
-            address(correctPayment),
-            address(0xDEF),
-            tokens,
-            balancesBefore,
-            amounts
-        );
+        Callback.tokenCallback(address(correctPayment), address(0xDEF), tokens, balancesBefore, amounts);
 
-        assertEq(
-            token0.balanceOf(address(this)),
-            initialBalance + amount,
-            "Should receive correct payment"
-        );
+        assertEq(token0.balanceOf(address(this)), initialBalance + amount, "Should receive correct payment");
     }
 
     // Tests for liquidityCallback
@@ -320,11 +230,7 @@ contract CallbackTest is Test {
 
         // Set up initial total supply
         mockLiquidity.setTotalSupply(
-            pairId,
-            liquidity0Long + 1000,
-            liquidity0Short + 2000,
-            liquidity1Long + 3000,
-            liquidity1Short + 4000
+            pairId, liquidity0Long + 1000, liquidity0Short + 2000, liquidity1Long + 3000, liquidity1Short + 4000
         );
 
         // Mock the liquidity contract call by setting up storage
