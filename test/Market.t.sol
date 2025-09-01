@@ -176,7 +176,8 @@ contract MarketTest is Test {
         address token1 = address(0xB);
         vm.assume(token0 < token1);
 
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        uint256 pairId = market.getPairId(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         assertEq(r0L, 0, "reserve0Long should be 0 for non-existent pair");
         assertEq(r0S, 0, "reserve0Short should be 0 for non-existent pair");
         assertEq(r1L, 0, "reserve1Long should be 0 for non-existent pair");
@@ -188,7 +189,7 @@ contract MarketTest is Test {
         address token1 = address(0xA); // Unsorted
 
         vm.expectRevert(Validation.tokenError.selector);
-        market.getReserves(token0, token1);
+        market.getPairId(token0, token1);
     }
 
     // Tests for getSweepable
@@ -519,7 +520,7 @@ contract MarketTest is Test {
         assertEq(liq1S, 1000000, "Initial LP mint for short1");
 
         // Check reserves
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         assertEq(r0L, 2000, "reserve0Long after initial add");
         assertEq(r0S, 2000, "reserve0Short after initial add");
         assertEq(r1L, 2000, "reserve1Long after initial add");
@@ -630,7 +631,8 @@ contract MarketTest is Test {
         market.createLiquidity(to, token0, token1, a0L, a0S, a1L, a1S);
 
         // Assert no revert and basic invariants (e.g., reserves > 0)
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        uint256 pairId = market.getPairId(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         assertTrue(r0L > 0 && r0S > 0 && r1L > 0 && r1S > 0, "Reserves should be >0 after add");
     }
 
@@ -677,7 +679,7 @@ contract MarketTest is Test {
 
         // Check reserves - they should be different from initial effective amount
         // Note: reserves might increase due to protocol fees being added back
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         uint256 effectiveAmount = initAmount - 1000; // 1000 after minimum liquidity
         assertTrue(r0L != effectiveAmount, "reserve0Long should have changed");
         assertTrue(r0S != effectiveAmount, "reserve0Short should have changed");
@@ -812,7 +814,7 @@ contract MarketTest is Test {
         console.log("Set up callback and approval");
 
         // Check pair exists
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         console.log("Reserves - r0L:", r0L);
         console.log("Reserves - r0S:", r0S);
         console.log("Reserves - r1L:", r1L);
@@ -929,7 +931,7 @@ contract MarketTest is Test {
         vm.prank(address(liquidityCallback));
         market.withdrawLiquidity(to, token0, token1, w0L, w0S, w1L, w1S);
 
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         assertTrue(r0L >= 1 && r0S >= 1 && r1L >= 1 && r1S >= 1, "Reserves >= min after withdraw");
     }
 
@@ -955,8 +957,8 @@ contract MarketTest is Test {
         market.createLiquidity(address(this), token0, token1, initAmount, initAmount, initAmount, initAmount);
 
         // Check reserves before swap
-        (uint128 r0L_before, uint128 r0S_before, uint128 r1L_before, uint128 r1S_before) =
-            market.getReserves(token0, token1);
+        uint256 pairId = market.getPairId(token0, token1);
+        (uint128 r0L_before, uint128 r0S_before, uint128 r1L_before, uint128 r1S_before) = market.getReserves(pairId);
         console.log("=== Before swap ===");
         console.log("Reserve0 (Long + Short):", r0L_before + r0S_before);
         console.log("Reserve1 (Long + Short):", r1L_before + r1S_before);
@@ -995,7 +997,7 @@ contract MarketTest is Test {
         assertEq(mockToken1.balanceOf(to), initialBalance1 + amountOut, "Recipient should receive tokens");
 
         // Check reserves updated
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         console.log("Reserve0 after (Long + Short):", r0L + r0S);
         console.log("Reserve1 after (Long + Short):", r1L + r1S);
         console.log("Reserve0 change:", int256(uint256(r0L + r0S)) - int256(uint256(r0L_before + r0S_before)));
@@ -1405,7 +1407,7 @@ contract MarketTest is Test {
         console.log("Set up callback and approval");
 
         // Check pair exists
-        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(token0, token1);
+        (uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
         console.log("Reserves - r0L:", r0L);
         console.log("Reserves - r0S:", r0S);
         console.log("Reserves - r1L:", r1L);
