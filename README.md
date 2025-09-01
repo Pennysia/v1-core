@@ -49,12 +49,14 @@ This mechanism creates **natural hedging** and rewards liquidity providers who c
 ### 🏦 **Liquidity Management**
 - **Directional liquidity** (long/short) per token with prediction rewards
 - **Cross-token fee distribution** rewards correct directional bets
+- **LP position swapping** via `lpSwap` to rebalance long/short without leaving the pool
 - **Dynamic rebalancing** through fee allocation and dilution
 - **Minimum liquidity** enforcement prevents pool drainage
 - **TTL-based approvals** using timestamps for enhanced security
 
 ### 📊 **Price Oracle**
 - **Time-weighted cbrt(price)** cumulative for manipulation resistance
+- **Q128 price input with cube-root accumulation; consumers compute TWAPs via deltas over time**
 - **Block timestamp** based accumulation
 - **Smooth price transitions** reduce oracle attack vectors
 
@@ -155,8 +157,8 @@ src/
 
 ```bash
 # Clone the repository
-git clone https://github.com/Pennysia/pennysia-v1-core.git
-cd pennysia-v1-core
+git clone https://github.com/Pennysia/v1-core.git
+cd v1-core
 
 # Install dependencies
 forge install
@@ -185,7 +187,10 @@ Market market = new Market(owner);
     amount1Short
 );
 
-// Perform a swap
+// Read reserves (pairId-based)
+(uint128 r0L, uint128 r0S, uint128 r1L, uint128 r1S) = market.getReserves(pairId);
+
+// Perform a token swap
 uint256 amountOut = market.swap(
     recipient,
     [token0, token1], // path
@@ -197,6 +202,18 @@ market.flash(
     recipient,
     [token0],
     [flashAmount]
+);
+
+// Swap LP between long/short within a pair
+// Example: move some longX to shortX and longY to shortY
+(, uint256 lOut0, uint256 lOut1) = market.lpSwap(
+    recipient,
+    token0,
+    token1,
+    /* longToShort0 */ true,
+    /* liquidity0    */ 500_000,
+    /* longToShort1 */ true,
+    /* liquidity1    */ 250_000
 );
 ```
 
