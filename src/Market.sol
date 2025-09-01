@@ -50,21 +50,17 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     }
 
     /// @notice Retrieves the long and short reserves for both tokens in a pair.
-    /// @param token0 First token.
-    /// @param token1 Second token.
+    /// @param pairId The pair ID.
     /// @return reserve0Long Long reserve of token0.
     /// @return reserve0Short Short reserve of token0.
     /// @return reserve1Long Long reserve of token1.
     /// @return reserve1Short Short reserve of token1.
-    function getReserves(address token0, address token1)
+    function getReserves(uint256 pairId)
         public
         view
         override
         returns (uint128 reserve0Long, uint128 reserve0Short, uint128 reserve1Long, uint128 reserve1Short)
     {
-        Validation.checkTokenOrder(token0, token1);
-
-        uint256 pairId = PairLibrary.computePairId(token0, token1);
         reserve0Long = pairs[pairId].reserve0Long;
         reserve0Short = pairs[pairId].reserve0Short;
         reserve1Long = pairs[pairId].reserve1Long;
@@ -163,8 +159,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     {
         address callback = msg.sender;
         Validation.notThis(to);
-        Validation.checkTokenOrder(token0, token1); // require pre-sorting of tokens
-        pairId = PairLibrary.computePairId(token0, token1);
+        pairId = getPairId(token0, token1); //require pre-sorting of tokens
         //request payment
         address[] memory tokens = new address[](2);
         tokens[0] = token0;
@@ -277,8 +272,7 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
     ) external nonReentrant noDelegateCall returns (uint256 pairId, uint256 amount0, uint256 amount1) {
         address callback = msg.sender;
         Validation.notThis(to);
-        Validation.checkTokenOrder(token0, token1);
-        pairId = PairLibrary.computePairId(token0, token1);
+        pairId = getPairId(token0, token1); //require pre-sorting of tokens
         require(pairs[pairId].reserve0Long > 0, pairNotFound());
         LpInfo memory lpInfo = _totalSupply[pairId];
 
@@ -377,11 +371,11 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
             (address token0, address token1, bool zeroForOne) =
                 path[i] < path[i + 1] ? (path[i], path[i + 1], true) : (path[i + 1], path[i], false);
 
-            uint256 pairId = PairLibrary.computePairId(token0, token1);
-            require(pairs[pairId].reserve0Long > 0, pairNotFound());
-
+            uint256 pairId = getPairId(token0, token1); //require pre-sorting of tokens
             (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short) =
-                getReserves(token0, token1);
+                getReserves(pairId);
+
+            require(reserve0Long > 0, pairNotFound());
 
             uint256 reserveIn = zeroForOne ? (reserve0Long + reserve0Short) : (reserve1Long + reserve1Short);
             uint256 reserveOut = zeroForOne ? (reserve1Long + reserve1Short) : (reserve0Long + reserve0Short);
@@ -441,6 +435,110 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         emit Swap(callback, to, path[0], path[length - 1], amount, amountOut);
     }
 
+    function lpSwap(
+        address to,
+        address token0,
+        address token1,
+        bool longToShort0,
+        uint256 liquidity0,
+        bool longToShort1,
+        uint256 liquidity1
+    ) external nonReentrant noDelegateCall returns (uint256 pairId, uint256 liquidityOut0, uint256 liquidityOut1) {
+        address callback = msg.sender;
+        Validation.notThis(to);
+
+        pairId = getPairId(token0, token1); //require pre-sorting of tokens
+        (uint128 reserve0Long, uint128 reserve0Short, uint128 reserve1Long, uint128 reserve1Short) = getReserves(pairId);
+        require(reserve0Long > 0, pairNotFound());
+
+        LpInfo memory lpInfo = _totalSupply[pairId];
+
+        //acquire payment, burn LP tokens
+        Callback.liquidityCallback(
+            callback,
+            to,
+            pairId,
+            longToShort0 ? liquidity0.safe128() : 0,
+            longToShort0 ? 0 : liquidity0.safe128(),
+            longToShort1 ? liquidity1.safe128() : 0,
+            longToShort1 ? 0 : liquidity1.safe128(),
+            lpInfo
+        );
+
+        uint128 toMint0Long;
+        uint128 toMint0Short;
+        uint128 toMint1Long;
+        uint128 toMint1Short;
+
+        if (liquidity0 > 0) {
+            //get rate of long0 and short0
+            uint256 rateLong0 = Math.fullMulDiv(lpInfo.longX, SCALE, reserve0Long);
+            uint256 rateShort0 = Math.fullMulDiv(lpInfo.shortX, SCALE, reserve0Short);
+
+            if (longToShort0) {
+                liquidityOut0 = Math.fullMulDiv(liquidity0, rateShort0, rateLong0);
+
+                uint256 reserveDeducted = Math.fullMulDiv(reserve0Long, liquidity0, lpInfo.longX);
+                uint256 mintliquidity0 = Math.fullMulDiv(lpInfo.shortX, reserveDeducted, reserve0Short);
+
+                reserve0Long -= reserveDeducted.safe128();
+                require(reserve0Long > 0, minimumLiquidity());
+
+                reserve0Short += reserveDeducted.safe128();
+                toMint0Short = mintliquidity0.safe128();
+            } else {
+                liquidityOut0 = Math.fullMulDiv(liquidity0, rateLong0, rateShort0);
+
+                uint256 reserveDeducted = Math.fullMulDiv(reserve0Short, liquidity0, lpInfo.shortX);
+                uint256 mintliquidity0 = Math.fullMulDiv(lpInfo.longX, reserveDeducted, reserve0Long);
+
+                reserve0Short -= reserveDeducted.safe128();
+                require(reserve0Short > 0, minimumLiquidity());
+
+                reserve0Long += reserveDeducted.safe128();
+                toMint0Long = mintliquidity0.safe128();
+            }
+        }
+
+        if (liquidity1 > 0) {
+            //get rate of long1 and short1
+            uint256 rateLong1 = Math.fullMulDiv(lpInfo.longY, SCALE, reserve1Long);
+            uint256 rateShort1 = Math.fullMulDiv(lpInfo.shortY, SCALE, reserve1Short);
+
+            if (longToShort1) {
+                liquidityOut1 = Math.fullMulDiv(liquidity1, rateShort1, rateLong1);
+
+                uint256 reserveDeducted = Math.fullMulDiv(reserve1Long, liquidity1, lpInfo.longY);
+                uint256 mintliquidity1 = Math.fullMulDiv(lpInfo.shortY, reserveDeducted, reserve1Short);
+
+                reserve1Long -= reserveDeducted.safe128();
+                require(reserve1Long > 0, minimumLiquidity());
+
+                reserve1Short += reserveDeducted.safe128();
+                toMint1Short = mintliquidity1.safe128();
+            } else {
+                liquidityOut1 = Math.fullMulDiv(liquidity1, rateLong1, rateShort1);
+
+                uint256 reserveDeducted = Math.fullMulDiv(reserve1Short, liquidity1, lpInfo.shortY);
+                uint256 mintliquidity1 = Math.fullMulDiv(lpInfo.longY, reserveDeducted, reserve1Long);
+
+                reserve1Short -= reserveDeducted.safe128();
+                require(reserve1Short > 0, minimumLiquidity());
+
+                reserve1Long += reserveDeducted.safe128();
+                toMint1Long = mintliquidity1.safe128();
+            }
+        }
+
+        _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
+
+        _mint(to, pairId, toMint0Long, toMint0Short, toMint1Long, toMint1Short);
+
+        emit LiquiditySwap(
+            callback, to, pairId, longToShort0, liquidity0, liquidityOut0, longToShort1, liquidity1, liquidityOut1
+        );
+    }
+
     /// @dev Internal function to update pair reserves and cumulative oracle price.
     /// @param pairId The pair ID.
     /// @param reserve0Long Updated token0 long reserve.
@@ -457,14 +555,15 @@ contract Market is IMarket, Liquidity, NoDelegatecall, ReentrancyGuard {
         uint256 reserve0Total = reserve0Long + reserve0Short;
         uint256 reserve1Total = reserve1Long + reserve1Short;
         uint64 blockTimestamp = uint64(block.timestamp); // won't overflow until the year 292 billion AD.
-        uint64 timeElasped = blockTimestamp - pairs[pairId].blockTimestampLast;
+        uint64 timeElapsed = blockTimestamp - pairs[pairId].blockTimestampLast;
         // Update cumulative cube-root price for oracle.
-        if (timeElasped > 0) {
+        if (timeElapsed > 0) {
             uint256 priceX128 = Math.fullMulDiv(reserve1Total, SCALE, reserve0Total);
             uint256 cbrtPriceX128 = Math.cbrt(priceX128);
-            pairs[pairId].cbrtPriceX128CumulativeLast += uint192(cbrtPriceX128 * timeElasped); // won't overflow
+            pairs[pairId].cbrtPriceX128CumulativeLast += uint192(cbrtPriceX128 * timeElapsed); // won't overflow
+
+            pairs[pairId].blockTimestampLast = blockTimestamp;
         }
-        pairs[pairId].blockTimestampLast = blockTimestamp;
 
         require(reserve0Long > 0 && reserve0Short > 0 && reserve1Long > 0 && reserve1Short > 0, minimumLiquidity());
         pairs[pairId].reserve0Long = reserve0Long.safe128();
