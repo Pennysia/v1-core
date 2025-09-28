@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 /// @title Interface for Pennysia's liquidity token
 /// @notice This interface defines the core functionalities, including ERC20-like operations

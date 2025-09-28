@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 /// @title Minimal ERC20 interface
 /// @notice Contains a subset of the full ERC20 interface

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 /// @title IMarket
 /// @notice Interface for the Pennysia Market contract handling pairs, liquidity, swaps, and more.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /// @notice Safe ETH and ERC20 transfer library that gracefully handles missing return values.
 /// @author Solady (https://github.com/vectorized/solady/blob/main/src/utils/SafeTransferLib.sol)
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 library TransferHelper {
     /// @dev The ETH transfer has failed.
