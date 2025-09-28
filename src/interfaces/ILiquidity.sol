@@ -2,52 +2,9 @@
 
 pragma solidity 0.8.30;
 
-/// @title Interface for Pennysia's liquidity token
-/// @notice This interface defines the core functionalities, including ERC20-like operations
-/// with support for long and short positions
 interface ILiquidity {
-    /// @notice Error thrown when attempting to transfer tokens without sufficient allowance
-    error InsufficientAllowance();
-
-    /// @notice Error thrown when attempting to transfer tokens to the LP token itself
-    error InvalidAddress();
-
-    /// @notice Structure representing LP token information
-    /// @param longX Amount of long position X tokens
-    /// @param shortX Amount of short position X tokens
-    /// @param longY Amount of long position Y tokens
-    /// @param shortY Amount of short position Y tokens
-    struct LpInfo {
-        uint128 longX;
-        uint128 shortX;
-        uint128 longY;
-        uint128 shortY;
-    }
-    /// @notice Event emitted when the approval amount for the spender of a given owner's tokens changes.
-    /// @param owner The account that approved spending of its tokens
-    /// @param spender The account for which the spending allowance was modified
-    /// @param poolId The poolId of the token
-    /// @param value block timestamp limit
-
-    event Approval(address indexed owner, address indexed spender, uint256 indexed poolId, uint256 value);
-
-    /// @notice Event emitted when LP tokens are transferred between accounts
-    /// @param from The account from which the LP tokens were sent
-    /// @param to The account to which the LP tokens were sent
-    /// @param poolId The poolId of the token
-    /// @param longX The amount of long position X tokens transferred
-    /// @param shortX The amount of short position X tokens transferred
-    /// @param longY The amount of long position Y tokens transferred
-    /// @param shortY The amount of short position Y tokens transferred
-    event Transfer(
-        address indexed from,
-        address indexed to,
-        uint256 indexed poolId,
-        uint128 longX,
-        uint128 shortX,
-        uint128 longY,
-        uint128 shortY
-    );
+    event Transfer(address indexed from, address indexed to, uint256 indexed id, uint256 amount);
+    event Approval(address indexed owner, address indexed spender, uint256 indexed id, uint256 amount);
 
     /// @notice Returns the name of the token
     /// @return The name of the token
@@ -62,77 +19,24 @@ interface ILiquidity {
     function decimals() external view returns (uint8);
 
     /// @notice Returns the total supply of LP tokens
-    /// @param poolId The poolId of the token
-    /// @return longX Amount of long position X tokens
-    /// @return shortX Amount of short position X tokens
-    /// @return longY Amount of long position Y tokens
-    /// @return shortY Amount of short position Y tokens
-    function totalSupply(uint256 poolId)
-        external
-        view
-        returns (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY);
+    /// @param id The tokenId
+    /// @return The total supply of the token
+    function totalSupply(uint256 id) external view returns (uint256);
 
-    /// @notice Returns the LP token balance of an account
-    /// @param account The address to query the balance of
-    /// @param poolId The poolId of the token
-    /// @return longX Amount of long position X tokens
-    /// @return shortX Amount of short position X tokens
-    /// @return longY Amount of long position Y tokens
-    /// @return shortY Amount of short position Y tokens
-    function balanceOf(address account, uint256 poolId)
-        external
-        view
-        returns (uint128 longX, uint128 shortX, uint128 longY, uint128 shortY);
+    function balanceOf(address account, uint256 id) external view returns (uint256);
 
-    /// @notice Returns the current allowance status between owner and spender
-    /// @param owner The address of the token owner
-    /// @param spender The address of the token spender
-    /// @param poolId The poolId of the token
-    /// @return the block timestamp limit
-    function allowance(address owner, address spender, uint256 poolId) external view returns (uint256);
+    function allowance(address owner, address spender, uint256 id) external view returns (uint256);
 
-    /// @notice Approves or revokes permission for a spender to transfer tokens
-    /// @param spender The address to approve or revoke permission for
-    /// @param poolId The poolId of the token
-    /// @param value the block timestamp limit
-    /// @return A boolean indicating whether the operation succeeded
-    function approve(address spender, uint256 poolId, uint256 value) external returns (bool);
+    function approve(address spender, uint256 id, uint256 amount) external returns (bool);
 
-    /// @notice Transfers LP tokens to another address
-    /// @param to The address to transfer tokens to
-    /// @param poolId The poolId of the token
-    /// @param longX The amount of long position X tokens to transfer
-    /// @param shortX The amount of short position X tokens to transfer
-    /// @param longY The amount of long position Y tokens to transfer
-    /// @param shortY The amount of short position Y tokens to transfer
-    /// @return A boolean indicating whether the transfer succeeded
-    function transfer(address to, uint256 poolId, uint128 longX, uint128 shortX, uint128 longY, uint128 shortY)
-        external
-        returns (bool);
+    function transfer(address to, uint256 id, uint256 amount) external returns (bool);
 
-    /// @notice Transfers LP tokens from one address to another
-    /// @param from The address to transfer tokens from
-    /// @param to The address to transfer tokens to
-    /// @param poolId The poolId of the token
-    /// @param longX The amount of long position X tokens to transfer
-    /// @param shortX The amount of short position X tokens to transfer
-    /// @param longY The amount of long position Y tokens to transfer
-    /// @param shortY The amount of short position Y tokens to transfer
-    /// @return A boolean indicating whether the transfer succeeded
-    function transferFrom(
-        address from,
-        address to,
-        uint256 poolId,
-        uint128 longX,
-        uint128 shortX,
-        uint128 longY,
-        uint128 shortY
-    ) external returns (bool);
+    function transferFrom(address from, address to, uint256 id, uint256 amount) external returns (bool);
 
     /// @notice Approves a spender to transfer tokens using a signature
     /// @param owner The address of the token owner
     /// @param spender The address to approve or revoke permission for
-    /// @param poolId The poolId of the token
+    /// @param id The tokenId
     /// @param value the block timestamp limit
     /// @param deadline The time at which the signature expires
     /// @param v The recovery byte of the signature
@@ -142,7 +46,7 @@ interface ILiquidity {
     function permit(
         address owner,
         address spender,
-        uint256 poolId,
+        uint256 id,
         uint256 value,
         uint256 deadline,
         uint8 v,
@@ -152,9 +56,9 @@ interface ILiquidity {
 
     /// @notice Returns the current nonce for an owner
     /// @param owner The address to query the nonce of
-    /// @param poolId The poolId of the token
+    /// @param id The tokenId
     /// @return The current nonce of the owner
-    function nonces(address owner, uint256 poolId) external view returns (uint256);
+    function nonces(address owner, uint256 id) external view returns (uint256);
 
     /// @notice Returns the domain separator used in the permit signature
     /// @return The domain separator
