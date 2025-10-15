@@ -2,22 +2,28 @@
 
 pragma solidity 0.8.30;
 
-import {ILiquidity} from "../interfaces/ILiquidity.sol";
+import {IERC6909} from "../interfaces/IERC6909.sol";
 import {Deadline} from "./Deadline.sol";
 
-abstract contract Liquidity is ILiquidity, Deadline {
+/// @notice Pennysia's LP token implementation
+/// @dev modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC6909.sol)
+
+abstract contract ERC6909 is IERC6909, Deadline {
     /*//////////////////////////////////////////////////////////////
-                              ERC20 STORAGE
+                             STORAGE
     //////////////////////////////////////////////////////////////*/
 
     //id -> supply
-    mapping(uint256 => uint256) public totalSupply;
+    mapping(uint256 => uint256) public override totalSupply;
 
     //acccount -> id -> balance
-    mapping(address => mapping(uint256 => uint256)) public balanceOf;
+    mapping(address => mapping(uint256 => uint256)) public override balanceOf;
 
     //owner -> spender -> id -> allowance
     mapping(address => mapping(address => mapping(uint256 => uint256))) public override allowance;
+
+    //owner -> operator -> boolean
+    mapping(address => mapping(address => bool)) public override isOperator;
 
     //owner -> id -> nonce
     mapping(address => mapping(uint256 => uint256)) public override nonces;
@@ -35,7 +41,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
     }
 
     /*//////////////////////////////////////////////////////////////
-                              ERC20 LOGIC
+                               LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function name() public pure override returns (string memory) {
@@ -56,13 +62,22 @@ abstract contract Liquidity is ILiquidity, Deadline {
         return true;
     }
 
-    function transfer(address to, uint256 id, uint256 amount) public returns (bool) {
+    function setOperator(address operator, bool approved) public override returns (bool) {
+        isOperator[msg.sender][operator] = approved;
+        emit OperatorSet(msg.sender, operator, approved);
+        return true;
+    }
+
+    function transfer(address to, uint256 id, uint256 amount) public override returns (bool) {
         _transfer(msg.sender, to, id, amount);
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 id, uint256 amount) public returns (bool) {
-        allowance[from][msg.sender][id] -= amount;
+    function transferFrom(address from, address to, uint256 id, uint256 amount) public override returns (bool) {
+        if (msg.sender != from && !isOperator[from][msg.sender]) {
+            uint256 allowed = allowance[from][msg.sender][id];
+            if (allowed != type(uint256).max) allowance[from][msg.sender][id] = allowed - amount;
+        }
         _transfer(from, to, id, amount);
         return true;
     }
@@ -85,16 +100,6 @@ abstract contract Liquidity is ILiquidity, Deadline {
                               EIP-2612
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Approves a spender to transfer tokens using a signature
-    /// @param owner The address of the token owner
-    /// @param spender The address to approve or revoke permission for
-    /// @param id The tokenId
-    /// @param value The token amount
-    /// @param deadline The time at which the signature expires
-    /// @param v The recovery byte of the signature
-    /// @param r Half of the ECDSA signature pair
-    /// @param s Half of the ECDSA signature pair
-    /// @return A boolean indicating whether the operation succeeded
     function permit(
         address owner,
         address spender,
@@ -142,13 +147,10 @@ abstract contract Liquidity is ILiquidity, Deadline {
         return true;
     }
 
-    /// @notice Returns the domain separator used in the permit signature
-    /// @return The domain separator
     function DOMAIN_SEPARATOR() public view override returns (bytes32) {
         return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
     }
 
-    /// @notice Computes the domain separator for permit functionality
     function computeDomainSeparator() private view returns (bytes32) {
         return keccak256(
             abi.encode(

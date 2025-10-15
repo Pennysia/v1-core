@@ -4,26 +4,20 @@ pragma solidity 0.8.30;
 abstract contract ReentrancyGuard {
     error Reentrancy();
 
-    /// @dev Equivalent to: `uint72(bytes9(keccak256("_REENTRANCY_GUARD_SLOT")))`.
-    /// 9 bytes is large enough to avoid collisions in practice,
-    /// but not too large to result in excessive bytecode bloat.
-    uint256 private constant _REENTRANCY_GUARD_SLOT = 0x929eee149b4bd21268;
-
     /// @dev Guards a function from reentrancy.
     /// Retreived from Soledge (https://github.com/vectorized/soledge/blob/main/src/utils/ReentrancyGuard.sol)
     modifier nonReentrant() virtual {
-        /// @solidity memory-safe-assembly
-        assembly {
-            if tload(_REENTRANCY_GUARD_SLOT) {
+        assembly ("memory-safe") {
+            /// @dev Equivalent to: `uint72(bytes9(keccak256("_REENTRANCY_GUARD_SLOT")))`.
+            if tload(0x929eee149b4bd21268) {
                 mstore(0x00, 0xab143c06) // `Reentrancy()`.
                 revert(0x1c, 0x04)
             }
-            tstore(_REENTRANCY_GUARD_SLOT, address())
+            tstore(0x929eee149b4bd21268, address())
         }
         _;
-        /// @solidity memory-safe-assembly
-        assembly {
-            tstore(_REENTRANCY_GUARD_SLOT, 0)
+        assembly ("memory-safe") {
+            tstore(0x929eee149b4bd21268, 0)
         }
     }
 }

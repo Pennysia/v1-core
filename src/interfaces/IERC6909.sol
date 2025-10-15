@@ -2,9 +2,10 @@
 
 pragma solidity 0.8.30;
 
-interface ILiquidity {
+interface IERC6909 {
     event Transfer(address indexed from, address indexed to, uint256 indexed id, uint256 amount);
     event Approval(address indexed owner, address indexed spender, uint256 indexed id, uint256 amount);
+    event OperatorSet(address indexed owner, address indexed operator, bool approved);
 
     /// @notice Returns the name of the token
     /// @return The name of the token
@@ -23,14 +24,51 @@ interface ILiquidity {
     /// @return The total supply of the token
     function totalSupply(uint256 id) external view returns (uint256);
 
+    /// @notice Returns the balance of an account for a token
+    /// @param account The address of the account
+    /// @param id The tokenId
+    /// @return The balance of the account
     function balanceOf(address account, uint256 id) external view returns (uint256);
 
+    /// @notice Returns the allowance of an account for a token
+    /// @param owner The address of the account
+    /// @param spender The address of the spender
+    /// @param id The tokenId
+    /// @return The allowance of the account
     function allowance(address owner, address spender, uint256 id) external view returns (uint256);
 
+    /// @notice Returns the operator status of an account for a token
+    /// @param owner The address of the account
+    /// @param operator The address of the operator
+    /// @return The operator status of the account
+    function isOperator(address owner, address operator) external view returns (bool);
+
+    /// @notice Approves an account to spend a token
+    /// @param spender The address of the spender
+    /// @param id The tokenId
+    /// @param amount The amount of the token to approve
+    /// @return A boolean indicating whether the operation succeeded
     function approve(address spender, uint256 id, uint256 amount) external returns (bool);
 
+    /// @notice Sets the operator status of an account for a token
+    /// @param operator The address of the operator
+    /// @param approved The operator status
+    /// @return A boolean indicating whether the operation succeeded
+    function setOperator(address operator, bool approved) external returns (bool);
+
+    /// @notice Transfers a token to an account
+    /// @param to The address of the recipient
+    /// @param id The tokenId
+    /// @param amount The amount of the token to transfer
+    /// @return A boolean indicating whether the operation succeeded
     function transfer(address to, uint256 id, uint256 amount) external returns (bool);
 
+    /// @notice Transfers a token from an account to another account
+    /// @param from The address of the sender
+    /// @param to The address of the recipient
+    /// @param id The tokenId
+    /// @param amount The amount of the token to transfer
+    /// @return A boolean indicating whether the operation succeeded
     function transferFrom(address from, address to, uint256 id, uint256 amount) external returns (bool);
 
     /// @notice Approves a spender to transfer tokens using a signature
