@@ -1,6 +1,6 @@
 # Pennysia AMM V1 Core 
 
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.28-blue.svg)](https://docs.soliditylang.org/) [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-red.svg)](https://getfoundry.sh/) [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![CI](https://github.com/Pennysia/v1-core/actions/workflows/test.yml/badge.svg)](https://github.com/Pennysia/v1-core/actions/workflows/test.yml)
+[![Solidity](https://img.shields.io/badge/Solidity-0.8.30-blue.svg)](https://docs.soliditylang.org/) [![Foundry](https://img.shields.io/badge/Built%20with-Foundry-yellow.svg)](https://getfoundry.sh/) [![License: GPL-3.0-or-later](https://img.shields.io/badge/License-Business_Source_1.1-red)](https://en.wikipedia.org/wiki/Business_Source_License) [![CI](https://github.com/Pennysia/v1-core/actions/workflows/test.yml/badge.svg)](https://github.com/Pennysia/v1-core/actions/workflows/test.yml)
 
 An innovative Automated Market Maker (AMM) protocol featuring a unique **long/short liquidity model** for enhanced capital efficiency and liquidity provider incentives.
 
