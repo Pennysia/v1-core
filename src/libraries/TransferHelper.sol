@@ -10,8 +10,8 @@ library TransferHelper {
     /// @dev The ERC20 `transfer` has failed.
     error TransferFailed();
 
-    /// @dev Sends `amount` of ERC20 `token` from the current contract to `to`.
-    /// Reverts upon failure.
+    /// @dev Sends `amount` of ERC20 `token` from the current contract to `to`. Reverts upon failure.
+    /// IMPORTANT: if amount == 0, bypass the transfer.
     function safeTransfer(address token, address to, uint256 amount) internal {
         if (amount != 0) {
             if (token != address(0)) {
