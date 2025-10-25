@@ -121,9 +121,7 @@ abstract contract ERC6909 is IERC6909, Deadline {
                         DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                keccak256(
-                                    "Permit(address owner,address spender,uint256 id,uint256 value,uint256 nonce,uint256 deadline)"
-                                ),
+                                0x41b82e2b5a0c36576b0cbe551120f192388f4a0e73168b730f27a8a467e1f79f, // keccak256("Permit(address owner,address spender,uint256 id,uint256 value,uint256 nonce,uint256 deadline)")
                                 owner,
                                 spender,
                                 id,
@@ -154,9 +152,9 @@ abstract contract ERC6909 is IERC6909, Deadline {
     function computeDomainSeparator() private view returns (bytes32) {
         return keccak256(
             abi.encode(
-                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f, //keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
-                0x8485c8f9ff1831604071989682a90eadc69f950358057c3b4a600e0942b750fa, //keccak256(bytes(name))
-                0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6, //keccak256("1")
+                0x8b73c3c69bb8fe3d512ecc4cf759cc79239f7b179b0ffacaa9a75d522b39400f, // keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
+                0x8485c8f9ff1831604071989682a90eadc69f950358057c3b4a600e0942b750fa, // keccak256(bytes(name))
+                0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6, // keccak256("1")
                 block.chainid,
                 address(this)
             )
