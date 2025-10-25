@@ -2,14 +2,14 @@
 pragma solidity 0.8.30;
 
 library Validation {
-    error tokenError();
+    error orderError();
     error lengthError();
     error selfCall();
     error zeroValue();
-    error duplicatedToken();
+    error duplicatedInput();
 
-    function checkTokenOrder(address token0, address token1) internal pure {
-        require(token0 < token1, tokenError());
+    function checkTokenOrder(address input0, address input1) internal pure {
+        require(input0 < input1, orderError());
     }
 
     function equalLengths(uint256 length0, uint256 length1) internal pure {
@@ -24,10 +24,12 @@ library Validation {
         require(input > 0, zeroValue());
     }
 
-    function checkUnique(address[] memory tokens) internal pure {
-        for (uint256 i = 0; i < tokens.length; i++) {
-            for (uint256 j = i + 1; j < tokens.length; j++) {
-                require(tokens[i] != tokens[j], duplicatedToken());
+    function checkRedundantNative(address[] memory inputs) internal pure {
+        bool hasNative;
+        for (uint256 i = 0; i < inputs.length; i++) {
+            if (inputs[i] == address(0)) {
+                require(!hasNative, duplicatedInput());
+                hasNative = true;
             }
         }
     }
