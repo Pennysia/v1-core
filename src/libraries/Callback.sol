@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 import {IPayment} from "../interfaces/IPayment.sol";
-import {IERC6909} from "../interfaces/IERC6909.sol";
 import {PairLibrary} from "./PairLibrary.sol";
 
 library Callback {
