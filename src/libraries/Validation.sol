@@ -33,14 +33,4 @@ library Validation {
             }
         }
     }
-
-    function checkFeeRange(uint256 fee) internal pure returns (uint256 _fee) {
-        if (fee < 100) {
-            _fee = 100;
-        } else if (fee > 500) {
-            _fee = 500;
-        } else {
-            _fee = fee;
-        }
-    }
 }
