@@ -16,6 +16,7 @@ abstract contract Liquidity is ILiquidity, Deadline {
     //id -> supply
     mapping(uint256 => uint256) public override totalSupply;
 
+    //id -> voteWeight
     mapping(uint256 => uint256) public override totalVoteWeight;
 
     //acccount -> id -> balance
@@ -43,6 +44,11 @@ abstract contract Liquidity is ILiquidity, Deadline {
     constructor() {
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
+    }
+
+    modifier feeRange(uint256 fee) {
+        require(fee >= 100 && fee <= 500);
+        _;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -88,16 +94,53 @@ abstract contract Liquidity is ILiquidity, Deadline {
     }
 
     function _transfer(address from, address to, uint256 id, uint256 amount) private {
-        if (to != address(0)) {
-            balanceOf[from][id] -= amount;
-            // Cannot overflow because the sum of all user
-            // balances can't exceed the max uint256 value.
-            unchecked {
-                balanceOf[to][id] += amount;
-            }
-            emit Transfer(from, to, id, amount);
-        } else {
+        if (to == address(0)) {
             _burn(from, id, amount);
+        } else {
+            uint256 balanceBeforeFrom = balanceOf[from][id];
+            uint256 balanceBeforeTo = balanceOf[to][id];
+            uint256 balanceAfterFrom = balanceBeforeFrom - amount;
+            uint256 balanceAfterTo = balanceBeforeTo + amount;
+
+            uint256 feeFrom = voteOf[from][id];
+            uint256 feeTo = voteOf[to][id];
+
+            if (feeTo == 0) feeTo = feeFrom;
+
+            _updateFee(from, id, feeFrom, balanceBeforeFrom, balanceAfterFrom);
+            _updateFee(to, id, feeTo, balanceBeforeTo, balanceAfterTo);
+
+            balanceOf[from][id] = balanceAfterFrom;
+            balanceOf[to][id] = balanceAfterTo;
+
+            emit Transfer(from, to, id, amount);
+        }
+    }
+
+    function voteFee(uint256 id, uint256 fee) public override {
+        uint256 balance = balanceOf[msg.sender][id];
+        _updateFee(msg.sender, id, fee, balance, balance);
+    }
+
+    /// NOTE: even the balance&supply = 0, user can still vote for the fee. but the global weight won't change.
+    function _updateFee(address account, uint256 id, uint256 newFee, uint256 oldBalance, uint256 newBalance)
+        private
+        feeRange(newFee)
+    {
+        uint256 oldFee = voteOf[account][id];
+        if (newFee != oldFee) {
+            voteOf[account][id] = newFee;
+            emit VoteFee(account, id, newFee);
+        }
+
+        uint256 oldWeight = oldBalance * oldFee;
+        uint256 newWeight = newBalance * newFee;
+
+        if (oldWeight != newWeight) {
+            uint256 globalWeight = totalVoteWeight[id];
+            globalWeight -= oldWeight;
+            globalWeight += newWeight;
+            totalVoteWeight[id] = globalWeight;
         }
     }
 
@@ -170,23 +213,25 @@ abstract contract Liquidity is ILiquidity, Deadline {
                               Mint & Burn
     //////////////////////////////////////////////////////////////*/
 
-    function _mint(address to, uint256 id, uint256 amount) internal {
+    function _mint(address to, uint256 id, uint256 amount, uint256 fee) internal {
+        uint256 oldBalance = balanceOf[to][id];
+        uint256 newBalance = oldBalance + amount;
+        _updateFee(to, id, fee, oldBalance, newBalance);
+
         totalSupply[id] += amount;
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            balanceOf[to][id] += amount;
-        }
+        balanceOf[to][id] = newBalance;
+
         emit Transfer(address(0), to, id, amount);
     }
 
     function _burn(address from, uint256 id, uint256 amount) internal {
-        balanceOf[from][id] -= amount;
-        // Cannot underflow because a user's balance
-        // will never be larger than the total supply.
-        unchecked {
-            totalSupply[id] -= amount;
-        }
+        uint256 oldBalance = balanceOf[from][id];
+        uint256 newBalance = oldBalance - amount;
+        _updateFee(from, id, voteOf[from][id], oldBalance, newBalance);
+
+        totalSupply[id] -= amount;
+        balanceOf[from][id] = newBalance;
+
         emit Transfer(from, address(0), id, amount);
     }
 }
