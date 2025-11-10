@@ -8,4 +8,9 @@ library SafeCast {
         y = uint128(x);
         require(y == x, SafeCastOverflow());
     }
+
+    function safe64(uint256 x) internal pure returns (uint64 y) {
+        y = uint64(x);
+        require(y == x, SafeCastOverflow());
+    }
 }
