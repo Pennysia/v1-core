@@ -7,6 +7,11 @@ library Validation {
     error selfCall();
     error zeroValue();
     error duplicatedInput();
+    error feeRangeError();
+    error dividerRangeError();
+
+    uint256 internal constant MINIMUM_LIQUIDITY = 3000;
+    uint256 internal constant SCALE = 340282366920938463463374607431768211455; // equal to type(uint128).max
 
     function checkTokenOrder(address input0, address input1) internal pure {
         require(input0 < input1, orderError());
@@ -32,5 +37,13 @@ library Validation {
                 hasNative = true;
             }
         }
+    }
+
+    function checkFeeRange(uint256 fee) internal pure {
+        require(fee >= 100 && fee <= 500, feeRangeError());
+    }
+
+    function checkDividerRange(uint256 input) internal pure {
+        require(input <= SCALE, dividerRangeError());
     }
 }
