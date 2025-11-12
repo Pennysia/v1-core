@@ -7,7 +7,6 @@ library Validation {
     error selfCall();
     error zeroValue();
     error duplicatedInput();
-    error feeRangeError();
     error dividerRangeError();
 
     uint256 internal constant MINIMUM_LIQUIDITY = 3000;
@@ -39,8 +38,10 @@ library Validation {
         }
     }
 
-    function checkFeeRange(uint256 fee) internal pure {
-        require(fee >= 100 && fee <= 500, feeRangeError());
+    function checkFeeRange(uint256 fee) internal pure returns (uint256) {
+        if (fee < 100) return 100;
+        if (fee > 500) return 500;
+        return fee;
     }
 
     function checkDividerRange(uint256 input) internal pure {
