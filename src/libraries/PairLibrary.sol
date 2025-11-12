@@ -7,4 +7,8 @@ library PairLibrary {
     function getBalance(address token) internal view returns (uint256 balance) {
         balance = token == address(0) ? address(this).balance : IERC20(token).balanceOf(address(this));
     }
+
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
 }
