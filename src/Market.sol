@@ -19,7 +19,6 @@ import {IMarket} from "./interfaces/IMarket.sol";
 contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
     using SafeCast for uint256;
 
-    // token0 -> token1 -> pairId (required sorting of tokens)
     mapping(address => mapping(address => Pair)) public override pairs;
 
     uint256 public override totalPairs;
@@ -30,9 +29,9 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
 
     //--------------------------------- Read-Only Functions ---------------------------------
 
-    function getPrice(address token0, address token1) public view override returns (uint256 priceX128) {
+    function getPrice(address token0, address token1) public view override returns (uint256 price) {
         Pair storage pair = pairs[token0][token1];
-        priceX128 = Math.fullMulDiv(pair.reserve1, Constant.SCALE, pair.reserve0);
+        price = Math.fullMulDiv(pair.reserve1, Constant.SCALE, pair.reserve0);
     }
 
     function getReserve(address token0, address token1)
@@ -56,8 +55,8 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         uint256 dividerX128 = pairs[token0][token1].dividerX128;
 
         reserve0Long = Math.fullMulDiv(reserve0, Constant.SCALE, dividerX128);
-        reserve1Long = Math.fullMulDiv(reserve1, Constant.SCALE, dividerX128);
         reserve0Short = reserve0 - reserve0Long;
+        reserve1Long = Math.fullMulDiv(reserve1, Constant.SCALE, dividerX128);
         reserve1Short = reserve1 - reserve1Long;
     }
 
@@ -115,6 +114,7 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         emit Flash(callback, to, tokens, amounts, paybackAmounts);
     }
 
+
     function create(address to, address token0, address token1, uint256 amount0, uint256 amount1, uint256 fee) external override nonReentrant onlyRouter {        
         Validation.notThis(to);
         Validation.checkTokenOrder(token0, token1); // require pre-sorting of tokens
@@ -127,6 +127,10 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         uint256 idLong = idShort - 1;
         uint256 halfLiquidity = Math.sqrt(amount0 * amount1) >> 1;
 
+        //--- Step 1: ask for payment
+        IPayment(msg.sender).requestToken(to, new address[](2){token0, token1}, new uint256[](2){amount0, amount1}); // user paybacks
+
+        //--- Step2: mint liquidity and update reserve
         require(halfLiquidity > Validation.MINIMUM_LIQUIDITY, notEnoughLiquidity());
         _mint(address(0), idLong, halfLiquidity,fee); // locked liquidity
         _mint(address(0), idShort, halfLiquidity,fee); // locked liquidity
@@ -135,7 +139,10 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         pair.poolId = pairNumber.safe128();
         pair.deployer = to;
         _updateReserve(token0, token1, amount0, amount1, Validation.Constant >> 1);
-        emit Create(token0, token1, pairNumber);
+
+        tokenBalances[token0] += amount0;
+        tokenBalances[token1] += amount1;
+        emit Create(token0, token1, to);
     }
 
     // NOTE: fee-on-transfer tokens are NOT supported.
@@ -143,11 +150,10 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
     // NOTE: if amount0 or amount1 is 0, liquidity output will become 0.
     function deposit(
         address to, //checked
-        address token0,
-        address token1,
-        uint256 amount0,//checked
-        uint256 amount1,//checked
-        uint256 divider, //checked
+        address token0, //checked
+        address token1, //checked
+        uint256 liquidityLong,
+        uint256 liquidityShort,
         uint256 fee //checked
     )
         external
@@ -156,17 +162,16 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         onlyRouter
         returns (
             uint256 amount0Required,
-            uint256 amount1Required,
-             uint256 liquidityLong,
-             uint256 liquidityShort
+            uint256 amount1Required
         )
     {
         Validation.notThis(to);
-        Validation.checkDividerRange(divider);
         Validation.checkTokenOrder(token0, token1); // require pre-sorting of tokens
         fee = Validation.checkFeeRange(fee); // modify fee to the range [100, 500]
 
         Pair storage pair = pairs[token0][token1];
+        require(pair.poolId > 0, pairNotFound());
+
 
         uint256 reserve0Long;
         uint256 reserve0Short;
