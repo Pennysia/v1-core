@@ -47,24 +47,23 @@ interface IMarket {
     /// @param deployer Deployer address.
     event Create(address indexed token0, address indexed token1, address indexed deployer);
 
-    // /// @notice Emitted when liquidity is minted.
-    // /// @param sender Caller.
-    // /// @param to Recipient.
-    // /// @param token0 First token.
-    // /// @param token1 Second token.
-    // /// @param amount0 Token0 amount.
-    // /// @param amount1 Token1 amount.
-    // /// @param longLiquidity Long liquidity amount.
-    // /// @param shortLiquidity Short liquidity amount.
-    // event Mint(
-    //     address indexed to,
-    //     address indexed token0,
-    //     address indexed token1,
-    //     uint256 amount0,
-    //     uint256 amount1,
-    //     uint256 longLiquidity,
-    //     uint256 shortLiquidity
-    // );
+    /// @notice Emitted when liquidity is minted.
+    /// @param to Recipient.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param amount0 Token0 amount.
+    /// @param amount1 Token1 amount.
+    /// @param longLiquidity Long liquidity amount.
+    /// @param shortLiquidity Short liquidity amount.
+    event Mint(
+        address indexed to,
+        address indexed token0,
+        address indexed token1,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 longLiquidity,
+        uint256 shortLiquidity
+    );
 
     // /// @notice Emitted when liquidity is burned.
     // /// @param sender Caller.
@@ -149,7 +148,7 @@ interface IMarket {
     /// @notice Gets token reserves for a pair.
     /// @param token0 First token.
     /// @param token1 Second token.
-    function getReserves(address token0, address token1) external view returns (uint256 reserve0, uint256 reserve1);
+    function getReserve(address token0, address token1) external view returns (uint256 reserve0, uint256 reserve1);
 
     /// @notice Gets directional reserves for a pair.
     /// @param token0 First token.
@@ -168,7 +167,7 @@ interface IMarket {
     /// @param token1 Second token.
     /// @return idLong Long token ID.
     /// @return idShort Short token ID.
-    function getTokenId(address token0, address token1) external view returns (uint256 idLong, uint256 idShort);
+    function getTokenId(address token0, address token1) external view returns (uint128 idLong, uint128 idShort);
 
     /// @notice Gets LP token liquidity for a pair.
     /// @param token0 First token.
@@ -200,6 +199,36 @@ interface IMarket {
     /// @param tokens Tokens.
     /// @param amounts Amounts.
     function flashloan(address to, address[] calldata tokens, uint256[] calldata amounts) external;
+
+    /// @notice Creates/adds liquidity.
+    /// @param to LP recipient.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param amount0 Amount of token0 to add.
+    /// @param amount1 Amount of token1 to add.
+    /// @param fee Fee.
+    /// @return poolId Pool ID.
+    function create(address to, address token0, address token1, uint256 amount0, uint256 amount1, uint256 fee)
+        external
+        returns (uint256 poolId);
+
+    /// @notice Deposits liquidity.
+    /// @param to LP recipient.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param liquidityLong Amount of long liquidity to deposit.
+    /// @param liquidityShort Amount of short liquidity to deposit.
+    /// @param fee Fee.
+    /// @return amount0Required Amount of token0 required.
+    /// @return amount1Required Amount of token1 required.
+    function deposit(
+        address to,
+        address token0,
+        address token1,
+        uint256 liquidityLong,
+        uint256 liquidityShort,
+        uint256 fee
+    ) external returns (uint256 amount0Required, uint256 amount1Required);
 
     // // State-changing functions
     // /// @notice Creates/adds liquidity.
