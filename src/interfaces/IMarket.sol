@@ -218,17 +218,11 @@ interface IMarket {
     /// @param token1 Second token.
     /// @param liquidityLong Amount of long liquidity to deposit.
     /// @param liquidityShort Amount of short liquidity to deposit.
-    /// @param fee Fee.
     /// @return amount0Required Amount of token0 required.
     /// @return amount1Required Amount of token1 required.
-    function deposit(
-        address to,
-        address token0,
-        address token1,
-        uint256 liquidityLong,
-        uint256 liquidityShort,
-        uint256 fee
-    ) external returns (uint256 amount0Required, uint256 amount1Required);
+    function deposit(address to, address token0, address token1, uint256 liquidityLong, uint256 liquidityShort)
+        external
+        returns (uint256 amount0Required, uint256 amount1Required);
 
     // // State-changing functions
     // /// @notice Creates/adds liquidity.
