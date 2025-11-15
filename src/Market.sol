@@ -125,7 +125,6 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
     {
         Validation.notThis(deployer);
         Validation.checkTokenOrder(token0, token1); // require pre-sorting of tokens
-        fee = Validation.checkFeeRange(fee); // modify fee to the range [100, 500]
 
         Pair storage pair = pairs[token0][token1];
         require(pair.poolId == 0, pairAlreadyExists());
@@ -162,17 +161,15 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
     // NOTE: fee-on-transfer tokens are NOT supported.
     // NOTE: slippage tolerance is checked in the Router contract.
     // NOTE: if amount0 or amount1 is 0, liquidity output will become 0.
-    function deposit(
-        address to, //checked
-        address token0, //checked
-        address token1, //checked
-        uint256 liquidityLong,
-        uint256 liquidityShort,
-        uint256 fee //checked
-    ) external override nonReentrant onlyRouter returns (uint256 amount0Required, uint256 amount1Required) {
+    function deposit(address to, address token0, address token1, uint256 liquidityLong, uint256 liquidityShort)
+        external
+        override
+        nonReentrant
+        onlyRouter
+        returns (uint256 amount0Required, uint256 amount1Required)
+    {
         Validation.notThis(to);
         Validation.checkTokenOrder(token0, token1); // require pre-sorting of tokens
-        fee = Validation.checkFeeRange(fee); // modify fee to the range [100, 500]
 
         uint256 poolId = pairs[token0][token1].poolId;
         require(poolId > 0, pairNotFound());
@@ -209,17 +206,25 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         IPayment(msg.sender).requestToken(to, tokens, amounts); // ask Router to pay
 
         //5.mint liquidity
-        _mint(to, (poolId * 2) - 1, liquidityLong, fee);
-        _mint(to, poolId * 2, liquidityShort, fee);
+        _mint(to, (poolId * 2) - 1, liquidityLong, 0);
+        _mint(to, poolId * 2, liquidityShort, 0);
 
         //6.update reserve
         _updateReserve(token0, token1, reserve0, reserve1, _divider);
         tokenBalances[token0] += amount0Required;
         tokenBalances[token1] += amount1Required;
 
-        // 4.emit Mint event
+        //7.emit Mint event
         emit Mint(to, token0, token1, amount0Required, amount1Required, liquidityLong, liquidityShort);
     }
+
+    // function withdraw(
+    //     address to,
+    //     address token0,
+    //     address token1,
+    //     uint256 liquidityLong,
+    //     uint256 liquidityShort
+    // )
 
     // function withdraw(
     //     address to,
