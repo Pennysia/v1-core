@@ -38,12 +38,6 @@ library Validation {
         }
     }
 
-    function checkFeeRange(uint256 fee) internal pure returns (uint256) {
-        if (fee < 100) return 100;
-        if (fee > 500) return 500;
-        return fee;
-    }
-
     function checkDividerRange(uint256 input) internal pure {
         require(input <= SCALE, dividerRangeError());
     }
