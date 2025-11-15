@@ -6,9 +6,6 @@ pragma solidity 0.8.30;
 /// @notice Interface for Pennysia's LP token implementation with fee voting
 /// @dev Based on ERC6909 multi-token standard with integrated governance for fee preferences
 interface ILiquidity {
-    /// @notice Thrown when deadline has passed
-    error Expired();
-
     /// @notice Emitted when tokens are transferred
     /// @param from The sender address
     /// @param to The recipient address
