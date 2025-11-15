@@ -46,11 +46,6 @@ abstract contract Liquidity is ILiquidity, Deadline {
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
     }
 
-    modifier feeRange(uint256 fee) {
-        require(fee >= 100 && fee <= 500);
-        _;
-    }
-
     /*//////////////////////////////////////////////////////////////
                                LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -123,10 +118,10 @@ abstract contract Liquidity is ILiquidity, Deadline {
     }
 
     /// NOTE: even the balance&supply = 0, user can still vote for the fee. but the global weight won't change.
-    function _updateFee(address account, uint256 id, uint256 newFee, uint256 oldBalance, uint256 newBalance)
-        private
-        feeRange(newFee)
-    {
+    function _updateFee(address account, uint256 id, uint256 newFee, uint256 oldBalance, uint256 newBalance) private {
+        if (newFee < 100) newFee = 100;
+        if (newFee > 500) newFee = 500;
+
         uint256 oldFee = voteOf[account][id];
         if (newFee != oldFee) {
             voteOf[account][id] = newFee;
@@ -216,6 +211,9 @@ abstract contract Liquidity is ILiquidity, Deadline {
     function _mint(address to, uint256 id, uint256 amount, uint256 fee) internal {
         uint256 oldBalance = balanceOf[to][id];
         uint256 newBalance = oldBalance + amount;
+
+        if (fee == 0) fee = voteOf[to][id];
+        if (fee == 0) fee = 100;
         _updateFee(to, id, fee, oldBalance, newBalance);
 
         totalSupply[id] += amount;
