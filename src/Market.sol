@@ -128,25 +128,27 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
 
         Pair storage pair = pairs[token0][token1];
         require(pair.poolId == 0, pairAlreadyExists());
+
         poolId = totalPairs + 1;
         uint256 idShort = poolId * 2;
         uint256 idLong = idShort - 1;
+
         uint256 halfLiquidity = Math.sqrt(amount0 * amount1) >> 1;
         require(halfLiquidity > PairLibrary.MINIMUM_LIQUIDITY, notEnoughLiquidity());
 
         //--- Step 1: ask for payment
-        address[] memory tokens = new address[](2);
-        tokens[0] = token0;
-        tokens[1] = token1;
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount0;
-        amounts[1] = amount1;
-        IPayment(msg.sender).requestToken(deployer, tokens, amounts); // user paybacks
+        IPayment(msg.sender)
+            .requestToken(
+                deployer,
+                PairLibrary.createTokenArrays(token0, token1),
+                PairLibrary.createAmountArrays(amount0, amount1)
+            );
 
-        //--- Step2: mint liquidity and update reserve
+        //--- Step2: mint liquidity and update storage
         _mint(address(0), idLong, halfLiquidity, fee); // locked liquidity
         _mint(address(0), idShort, halfLiquidity, fee); // locked liquidity
 
+        // Update storage in batch
         totalPairs = poolId;
         pair.poolId = poolId.safe128();
         pair.deployer = deployer;
@@ -172,7 +174,7 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         uint256 poolId = pairs[token0][token1].poolId;
         require(poolId > 0, pairNotFound()); // revert if 1. pool does not exist 2.token unsorted
 
-        //1.calculate how much amount0Long, 0short, 1long, 1short
+        //1.calculate proportional amounts
         (uint256 supplyLong, uint256 supplyShort) = getLiquidity(token0, token1);
         (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short) =
             getDirectionalReserve(token0, token1);
@@ -182,38 +184,37 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         uint256 amount1Long = Math.fullMulDiv(liquidityLong, reserve1Long, supplyLong);
         uint256 amount1Short = Math.fullMulDiv(liquidityShort, reserve1Short, supplyShort);
 
-        //2.calculate amount0Required, amount1Required
         amount0Required = amount0Long + amount0Short;
         amount1Required = amount1Long + amount1Short;
 
         uint256 reserve0 = reserve0Long + reserve0Short + amount0Required;
         uint256 reserve1 = reserve1Long + reserve1Short + amount1Required;
 
-        //3.calculate new divider
+        //2.calculate new divider and request payment
         uint256 _divider = PairLibrary.max(
             Math.fullMulDiv(reserve0, PairLibrary.SCALE, reserve0Long + amount0Long),
             Math.fullMulDiv(reserve1, PairLibrary.SCALE, reserve1Long + amount1Long)
-        ); // only use the most precised one
+        );
 
-        //4.ask for payment
-        address[] memory tokens = new address[](2);
-        tokens[0] = token0;
-        tokens[1] = token1;
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount0Required;
-        amounts[1] = amount1Required;
-        IPayment(msg.sender).requestToken(to, tokens, amounts); // ask Router to pay
+        IPayment(msg.sender)
+            .requestToken(
+                to,
+                PairLibrary.createTokenArrays(token0, token1),
+                PairLibrary.createAmountArrays(amount0Required, amount1Required)
+            );
 
-        //5.mint liquidity
-        _mint(to, (poolId * 2) - 1, liquidityLong, 0);
-        _mint(to, poolId * 2, liquidityShort, 0);
+        //3.mint liquidity tokens
+        uint256 longTokenId = (poolId * 2) - 1;
+        uint256 shortTokenId = poolId * 2;
+        _mint(to, longTokenId, liquidityLong, 0);
+        _mint(to, shortTokenId, liquidityShort, 0);
 
-        //6.update reserve
+        //4.update reserves
         _updateReserve(token0, token1, reserve0, reserve1, _divider);
         tokenBalances[token0] += amount0Required;
         tokenBalances[token1] += amount1Required;
 
-        //7.emit Mint event
+        //5.emit Mint event
         emit Mint(to, token0, token1, amount0Required, amount1Required, liquidityLong, liquidityShort);
     }
 
@@ -235,38 +236,39 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short) =
             getDirectionalReserve(token0, token1);
 
-        //1.calculate amounts
+        //1.calculate withdrawal amounts
         uint256 amount0Long = Math.fullMulDiv(liquidityLong, reserve0Long, supplyLong);
         uint256 amount0Short = Math.fullMulDiv(liquidityShort, reserve0Short, supplyShort);
         uint256 amount1Long = Math.fullMulDiv(liquidityLong, reserve1Long, supplyLong);
         uint256 amount1Short = Math.fullMulDiv(liquidityShort, reserve1Short, supplyShort);
 
-        //2.calcualte withdrawal amounts
         amount0 = amount0Long + amount0Short;
         amount1 = amount1Long + amount1Short;
 
         uint256 reserve0 = reserve0Long + reserve0Short - amount0;
         uint256 reserve1 = reserve1Long + reserve1Short - amount1;
 
-        //3.calculate new divider
-        uint256 divider0 = Math.fullMulDiv(reserve0, PairLibrary.SCALE, reserve0Long - amount0Long);
-        uint256 divider1 = Math.fullMulDiv(reserve1, PairLibrary.SCALE, reserve1Long - amount1Long);
-        uint256 _divider = PairLibrary.max(divider0, divider1); // only use the most precised one
+        //2.calculate new divider and burn tokens
+        uint256 _divider = PairLibrary.max(
+            Math.fullMulDiv(reserve0, PairLibrary.SCALE, reserve0Long - amount0Long),
+            Math.fullMulDiv(reserve1, PairLibrary.SCALE, reserve1Long - amount1Long)
+        );
 
-        //4.burn LP tokens
-        _burn(from, (poolId * 2) - 1, liquidityLong);
-        _burn(from, poolId * 2, liquidityShort);
+        uint256 longTokenId = (poolId * 2) - 1;
+        uint256 shortTokenId = poolId * 2;
+        _burn(from, longTokenId, liquidityLong);
+        _burn(from, shortTokenId, liquidityShort);
 
-        //5.update reserve
+        //3.update reserves
         _updateReserve(token0, token1, reserve0, reserve1, _divider);
         tokenBalances[token0] -= amount0;
         tokenBalances[token1] -= amount1;
 
-        //6. transfer tokens to `to`
+        //4. transfer tokens to `to`
         TransferHelper.safeTransfer(token0, to, amount0);
         TransferHelper.safeTransfer(token1, to, amount1);
 
-        //7.emit Withdraw event
+        //5.emit Withdraw event
         emit Withdraw(from, to, token0, token1, amount0, amount1, liquidityLong, liquidityShort);
     }
 
@@ -326,192 +328,6 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
 
         emit LiquiditySwap(from, to, token0, token1, longToShort, liquidityIn, liquidityOut);
     }
-
-    // function withdraw(
-    //     address to,
-    //     address token0,
-    //     address token1,
-    //     uint256 liquidity0Long,
-    //     uint256 liquidity0Short,
-    //     uint256 liquidity1Long,
-    //     uint256 liquidity1Short
-    // ) external override nonReentrant onlyRouter returns (uint256 pairId, uint256 amount0, uint256 amount1) {
-    //     address callback = msg.sender;
-    //     Validation.notThis(to);
-    //     pairId = getPairId(token0, token1); //require pre-sorting of tokens
-    //     require(pairs[pairId].reserve0Long > 0, pairNotFound());
-    //     LpInfo memory lpInfo = _totalSupply[pairId];
-
-    //     //request payment
-    //     Callback.liquidityCallback(
-    //         callback,
-    //         to,
-    //         pairId,
-    //         liquidity0Long.safe128(),
-    //         liquidity0Short.safe128(),
-    //         liquidity1Long.safe128(),
-    //         liquidity1Short.safe128(),
-    //         lpInfo
-    //     );
-
-    //     uint256 reserve0Long = pairs[pairId].reserve0Long;
-    //     uint256 reserve0Short = pairs[pairId].reserve0Short;
-    //     uint256 reserve1Long = pairs[pairId].reserve1Long;
-    //     uint256 reserve1Short = pairs[pairId].reserve1Short;
-
-    //     uint256 fee0Long;
-    //     uint256 fee0Short;
-    //     uint256 fee1Long;
-    //     uint256 fee1Short;
-
-    //     uint256 amountOut;
-
-    //     // Calculate exit fees and amounts out for each position.
-    //     if (liquidity0Long > 0) {
-    //         fee0Long = Math.divUp(liquidity0Long * FEE, 1000); // won't overflow because liquidity0Long is uint128
-    //         amountOut = Math.fullMulDiv(liquidity0Long - fee0Long, reserve0Long, lpInfo.longX);
-    //         amount0 += amountOut;
-    //         reserve0Long -= amountOut;
-    //         fee0Long = (fee0Long * 20) / 100;
-    //     }
-    //     if (liquidity0Short > 0) {
-    //         fee0Short = Math.divUp(liquidity0Short * FEE, 1000); // won't overflow
-    //         amountOut = Math.fullMulDiv(liquidity0Short - fee0Short, reserve0Short, lpInfo.shortX);
-    //         amount0 += amountOut;
-    //         reserve0Short -= amountOut;
-    //         fee0Short = (fee0Short * 20) / 100;
-    //     }
-    //     if (liquidity1Long > 0) {
-    //         fee1Long = Math.divUp(liquidity1Long * FEE, 1000); // won't overflow
-    //         amountOut = Math.fullMulDiv(liquidity1Long - fee1Long, reserve1Long, lpInfo.longY);
-    //         amount1 += amountOut;
-    //         reserve1Long -= amountOut;
-    //         fee1Long = (fee1Long * 20) / 100;
-    //     }
-    //     if (liquidity1Short > 0) {
-    //         fee1Short = Math.divUp(liquidity1Short * FEE, 1000); // won't overflow
-    //         amountOut = Math.fullMulDiv(liquidity1Short - fee1Short, reserve1Short, lpInfo.shortY);
-    //         amount1 += amountOut;
-    //         reserve1Short -= amountOut;
-    //         fee1Short = (fee1Short * 20) / 100;
-    //     }
-
-    //     // Update reserves and balances.
-    //     _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
-    //     _updateBalance(token0, token1, tokenBalances[token0] - amount0, tokenBalances[token1] - amount1);
-
-    //     // Mint protocol share of fees as LP.
-    //     _mint(address(this), pairId, fee0Long.safe128(), fee0Short.safe128(), fee1Long.safe128(), fee1Short.safe128());
-
-    //     // Transfer withdrawn tokens.
-    //     TransferHelper.safeTransfer(token0, to, amount0);
-    //     TransferHelper.safeTransfer(token1, to, amount1);
-    //     emit Burn(callback, to, pairId, amount0, amount1);
-    // }
-
-    // function lpSwap(
-    //     address to,
-    //     address token0,
-    //     address token1,
-    //     bool longToShort0,
-    //     uint256 liquidity0,
-    //     bool longToShort1,
-    //     uint256 liquidity1
-    // ) external override nonReentrant onlyRouter returns (uint256 pairId, uint256 liquidityOut0, uint256 liquidityOut1) {
-    //     address callback = msg.sender;
-    //     Validation.notThis(to);
-
-    //     pairId = getPairId(token0, token1); //require pre-sorting of tokens
-    //     (uint128 reserve0Long, uint128 reserve0Short, uint128 reserve1Long, uint128 reserve1Short) = getReserves(pairId);
-    //     require(reserve0Long > 0, pairNotFound());
-
-    //     LpInfo memory lpInfo = _totalSupply[pairId];
-
-    //     //acquire payment, burn LP tokens
-    //     Callback.liquidityCallback(
-    //         callback,
-    //         to,
-    //         pairId,
-    //         longToShort0 ? liquidity0.safe128() : 0,
-    //         longToShort0 ? 0 : liquidity0.safe128(),
-    //         longToShort1 ? liquidity1.safe128() : 0,
-    //         longToShort1 ? 0 : liquidity1.safe128(),
-    //         lpInfo
-    //     );
-
-    //     uint128 toMint0Long;
-    //     uint128 toMint0Short;
-    //     uint128 toMint1Long;
-    //     uint128 toMint1Short;
-
-    //     if (liquidity0 > 0) {
-    //         //get rate of long0 and short0
-    //         uint256 rateLong0 = Math.fullMulDiv(lpInfo.longX, SCALE, reserve0Long);
-    //         uint256 rateShort0 = Math.fullMulDiv(lpInfo.shortX, SCALE, reserve0Short);
-
-    //         if (longToShort0) {
-    //             liquidityOut0 = Math.fullMulDiv(liquidity0, rateShort0, rateLong0);
-
-    //             uint256 reserveDeducted = Math.fullMulDiv(reserve0Long, liquidity0, lpInfo.longX);
-    //             uint256 mintliquidity0 = Math.fullMulDiv(lpInfo.shortX, reserveDeducted, reserve0Short);
-
-    //             reserve0Long -= reserveDeducted.safe128();
-    //             require(reserve0Long > 0, minimumLiquidity());
-
-    //             reserve0Short += reserveDeducted.safe128();
-    //             toMint0Short = mintliquidity0.safe128();
-    //         } else {
-    //             liquidityOut0 = Math.fullMulDiv(liquidity0, rateLong0, rateShort0);
-
-    //             uint256 reserveDeducted = Math.fullMulDiv(reserve0Short, liquidity0, lpInfo.shortX);
-    //             uint256 mintliquidity0 = Math.fullMulDiv(lpInfo.longX, reserveDeducted, reserve0Long);
-
-    //             reserve0Short -= reserveDeducted.safe128();
-    //             require(reserve0Short > 0, minimumLiquidity());
-
-    //             reserve0Long += reserveDeducted.safe128();
-    //             toMint0Long = mintliquidity0.safe128();
-    //         }
-    //     }
-
-    //     if (liquidity1 > 0) {
-    //         //get rate of long1 and short1
-    //         uint256 rateLong1 = Math.fullMulDiv(lpInfo.longY, SCALE, reserve1Long);
-    //         uint256 rateShort1 = Math.fullMulDiv(lpInfo.shortY, SCALE, reserve1Short);
-
-    //         if (longToShort1) {
-    //             liquidityOut1 = Math.fullMulDiv(liquidity1, rateShort1, rateLong1);
-
-    //             uint256 reserveDeducted = Math.fullMulDiv(reserve1Long, liquidity1, lpInfo.longY);
-    //             uint256 mintliquidity1 = Math.fullMulDiv(lpInfo.shortY, reserveDeducted, reserve1Short);
-
-    //             reserve1Long -= reserveDeducted.safe128();
-    //             require(reserve1Long > 0, minimumLiquidity());
-
-    //             reserve1Short += reserveDeducted.safe128();
-    //             toMint1Short = mintliquidity1.safe128();
-    //         } else {
-    //             liquidityOut1 = Math.fullMulDiv(liquidity1, rateLong1, rateShort1);
-
-    //             uint256 reserveDeducted = Math.fullMulDiv(reserve1Short, liquidity1, lpInfo.shortY);
-    //             uint256 mintliquidity1 = Math.fullMulDiv(lpInfo.longY, reserveDeducted, reserve1Long);
-
-    //             reserve1Short -= reserveDeducted.safe128();
-    //             require(reserve1Short > 0, minimumLiquidity());
-
-    //             reserve1Long += reserveDeducted.safe128();
-    //             toMint1Long = mintliquidity1.safe128();
-    //         }
-    //     }
-
-    //     _updatePair(pairId, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
-
-    //     _mint(to, pairId, toMint0Long, toMint0Short, toMint1Long, toMint1Short);
-
-    //     emit LiquiditySwap(
-    //         callback, to, pairId, longToShort0, liquidity0, liquidityOut0, longToShort1, liquidity1, liquidityOut1
-    //     );
-    // }
 
     // function swap(address to, address[] memory path, uint256 amount)
     //     external

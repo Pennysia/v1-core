@@ -18,4 +18,18 @@ library PairLibrary {
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a : b;
     }
+
+    /// @dev Helper function to create token arrays for payment requests
+    function createTokenArrays(address token0, address token1) internal pure returns (address[] memory tokens) {
+        tokens = new address[](2);
+        tokens[0] = token0;
+        tokens[1] = token1;
+    }
+
+    /// @dev Helper function to create amount arrays for payment requests
+    function createAmountArrays(uint256 amount0, uint256 amount1) internal pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](2);
+        amounts[0] = amount0;
+        amounts[1] = amount1;
+    }
 }
