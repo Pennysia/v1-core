@@ -65,6 +65,35 @@ interface IMarket {
         uint256 shortLiquidity
     );
 
+    event Withdraw(
+        address indexed from,
+        address to,
+        address indexed token0,
+        address indexed token1,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 longLiquidity,
+        uint256 shortLiquidity
+    );
+
+    /// @notice Emitted when liquidity is swapped.
+    /// @param from Caller.
+    /// @param to Recipient.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param longToShort Whether to swap long to short.
+    /// @param liquidityIn Input liquidity amount.
+    /// @param liquidityOut Output liquidity amount.
+    event LiquiditySwap(
+        address indexed from,
+        address to,
+        address indexed token0,
+        address indexed token1,
+        bool longToShort,
+        uint256 liquidityIn,
+        uint256 liquidityOut
+    );
+
     // /// @notice Emitted when liquidity is burned.
     // /// @param sender Caller.
     // /// @param to Recipient.
@@ -223,6 +252,36 @@ interface IMarket {
     function deposit(address to, address token0, address token1, uint256 liquidityLong, uint256 liquidityShort)
         external
         returns (uint256 amount0Required, uint256 amount1Required);
+
+    /// @notice Withdraws liquidity.
+    /// @param from LP sender.
+    /// @param to Recipient.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param liquidityLong Amount of long liquidity to withdraw.
+    /// @param liquidityShort Amount of short liquidity to withdraw.
+    /// @return amount0 Amount of token0 withdrawn.
+    /// @return amount1 Amount of token1 withdrawn.
+    function withdraw(
+        address from,
+        address to,
+        address token0,
+        address token1,
+        uint256 liquidityLong,
+        uint256 liquidityShort
+    ) external returns (uint256 amount0, uint256 amount1);
+
+    /// @notice Swaps liquidity.
+    /// @param from LP sender.
+    /// @param to Recipient.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param longToShort Whether to swap long to short or short to long.
+    /// @param liquidityIn Amount of liquidity to swap.
+    /// @return liquidityOut Amount of liquidity swapped.
+    function lpSwap(address from, address to, address token0, address token1, bool longToShort, uint256 liquidityIn)
+        external
+        returns (uint256 liquidityOut);
 
     // // State-changing functions
     // /// @notice Creates/adds liquidity.
