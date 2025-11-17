@@ -7,10 +7,6 @@ library Validation {
     error selfCall();
     error zeroValue();
     error duplicatedInput();
-    error dividerRangeError();
-
-    uint256 internal constant MINIMUM_LIQUIDITY = 3000;
-    uint256 internal constant SCALE = 340282366920938463463374607431768211455; // equal to type(uint128).max
 
     function checkTokenOrder(address input0, address input1) internal pure {
         require(input0 < input1, orderError());
@@ -36,9 +32,5 @@ library Validation {
                 hasNative = true;
             }
         }
-    }
-
-    function checkDividerRange(uint256 input) internal pure {
-        require(input <= SCALE, dividerRangeError());
     }
 }
