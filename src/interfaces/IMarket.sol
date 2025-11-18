@@ -18,13 +18,14 @@ interface IMarket {
     error notEnoughLiquidity();
 
     struct Pair {
-        uint128 poolId; // ---> update on create a new pool
-        uint128 divider;
-        uint128 reserve0;
-        uint128 reserve1;
-        address deployer; // done---> update on create a new pool or change by exisiting deployer
-        uint96 blockTimestampLast;
+        uint128 reserve0Long;
+        uint128 reserve0Short;
+        uint128 reserve1Long;
+        uint128 reserve1Short;
         uint256 cbrtPriceCumulativeLast; // cum. of (cbrt(y/x * uint128.max))*timeElapsed
+        uint32 blockTimestampLast;
+        uint64 poolId; // update on create a new pool
+        address deployer; // update on create a new pool or change by exisiting deployer
     }
 
     /// @notice Emitted when deployer is updated.
@@ -113,29 +114,33 @@ interface IMarket {
     //--------------------------------- Read-Only Functions ---------------------------------
 
     /// @notice Gets pair data.
-    /// @return poolId liquidity pool ID.
-    /// @return divider liquidity divder between long and short
-    /// @return reserve0 reserve of token0 .
-    /// @return reserve1 rserve of token1.
-    /// @return deployer The pool deployer address
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @return reserve0Long reserve of token0 in long direction.
+    /// @return reserve0Short reserve of token0 in short direction.
+    /// @return reserve1Long reserve of token1 in long direction.
+    /// @return reserve1Short reserve of token1 in short direction.
+    /// @return cbrtPriceCumulativeLast cumulative cbrtTWAP price of the pool.
     /// @return blockTimestampLast The block timestamp of the last update.
-    /// @return cbrtPriceCumulativeLast The cumulative cbrtTWAP price of the pool.
+    /// @return poolId liquidity pool ID.
+    /// @return deployer The pool deployer address
     function pairs(address token0, address token1)
         external
         view
         returns (
-            uint128 poolId,
-            uint128 divider,
-            uint128 reserve0,
-            uint128 reserve1,
-            address deployer,
-            uint96 blockTimestampLast,
-            uint256 cbrtPriceCumulativeLast
+            uint128 reserve0Long,
+            uint128 reserve0Short,
+            uint128 reserve1Long,
+            uint128 reserve1Short,
+            uint256 cbrtPriceCumulativeLast,
+            uint32 blockTimestampLast,
+            uint64 poolId,
+            address deployer
         );
 
     /// @notice Gets total number of pairs.
     /// @return Total number of pairs.
-    function totalPairs() external view returns (uint256);
+    function totalPairs() external view returns (uint64);
 
     /// @notice Gets price of a pair.
     /// @param token0 First token.
@@ -146,16 +151,11 @@ interface IMarket {
     /// @notice Gets token reserves for a pair.
     /// @param token0 First token.
     /// @param token1 Second token.
-    function getReserve(address token0, address token1) external view returns (uint256 reserve0, uint256 reserve1);
-
-    /// @notice Gets directional reserves for a pair.
-    /// @param token0 First token.
-    /// @param token1 Second token.
     /// @return reserve0Long reserve of token0 in long direction.
     /// @return reserve0Short reserve of token0 in short direction.
     /// @return reserve1Long reserve of token1 in long direction.
     /// @return reserve1Short reserve of token1 in short direction.
-    function getDirectionalReserve(address token0, address token1)
+    function getReserve(address token0, address token1)
         external
         view
         returns (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short);
@@ -208,7 +208,7 @@ interface IMarket {
     /// @return poolId Pool ID.
     function create(address to, address token0, address token1, uint256 amount0, uint256 amount1, uint256 fee)
         external
-        returns (uint256 poolId);
+        returns (uint64 poolId);
 
     /// @notice Deposits liquidity.
     /// @param to LP recipient.
@@ -216,11 +216,11 @@ interface IMarket {
     /// @param token1 Second token.
     /// @param liquidityLong Amount of long liquidity to deposit.
     /// @param liquidityShort Amount of short liquidity to deposit.
-    /// @return amount0Required Amount of token0 required.
-    /// @return amount1Required Amount of token1 required.
+    /// @return amount0 Amount of token0 required.
+    /// @return amount1 Amount of token1 required.
     function deposit(address to, address token0, address token1, uint256 liquidityLong, uint256 liquidityShort)
         external
-        returns (uint256 amount0Required, uint256 amount1Required);
+        returns (uint256 amount0, uint256 amount1);
 
     /// @notice Withdraws liquidity.
     /// @param from LP sender.
