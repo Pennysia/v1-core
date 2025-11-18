@@ -94,37 +94,6 @@ interface IMarket {
         uint256 liquidityOut
     );
 
-    // /// @notice Emitted when liquidity is burned.
-    // /// @param sender Caller.
-    // /// @param to Recipient.
-    // /// @param pairId Pair ID.
-    // /// @param amount0 Token0 amount withdrawn.
-    // /// @param amount1 Token1 amount withdrawn.
-    // event Burn(address indexed sender, address indexed to, uint256 indexed pairId, uint256 amount0, uint256 amount1);
-
-    // /// @notice Emitted when liquidity is swapped.
-    // /// @param sender Caller.
-    // /// @param to Recipient.
-    // /// @param pairId Pair ID.
-    // /// @param longToShort0 Whether to swap long to short for token0.
-    // /// @param liquidity0 Amount of token0 liquidity to swap.
-    // /// @param liquidityOut0 Amount of token0 liquidity out.
-    // /// @param longToShort1 Whether to swap long to short for token1.
-    // /// @param liquidity1 Amount of token1 liquidity to swap.
-    // /// @param liquidityOut1 Amount of token1 liquidity out.
-    // /// @param longToShort0 Whether to swap long to short for token0.
-    // event LiquiditySwap(
-    //     address indexed sender,
-    //     address indexed to,
-    //     uint256 indexed pairId,
-    //     bool longToShort0,
-    //     uint256 liquidity0,
-    //     uint256 liquidityOut0,
-    //     bool longToShort1,
-    //     uint256 liquidity1,
-    //     uint256 liquidityOut1
-    // );
-
     // /// @notice Emitted when a swap occurs.
     // /// @param sender Caller.
     // /// @param to Recipient.
@@ -282,80 +251,6 @@ interface IMarket {
     function lpSwap(address from, address to, address token0, address token1, bool longToShort, uint256 liquidityIn)
         external
         returns (uint256 liquidityOut);
-
-    // // State-changing functions
-    // /// @notice Creates/adds liquidity.
-    // /// @param to LP recipient.
-    // /// @param token0 First token.
-    // /// @param token1 Second token.
-    // /// @param amount0Long Amount of token0 long to add.
-    // /// @param amount0Short Amount of token0 short to add.
-    // /// @param amount1Long Amount of token1 long to add.
-    // /// @param amount1Short Amount of token1 short to add.
-    // /// @return pairId
-    // /// @return liquidity0Long
-    // /// @return liquidity0Short
-    // /// @return liquidity1Long
-    // /// @return liquidity1Short
-    // function createLiquidity(
-    //     address to,
-    //     address token0,
-    //     address token1,
-    //     uint256 amount0Long,
-    //     uint256 amount0Short,
-    //     uint256 amount1Long,
-    //     uint256 amount1Short
-    // )
-    //     external
-    //     returns (
-    //         uint256 pairId,
-    //         uint256 liquidity0Long,
-    //         uint256 liquidity0Short,
-    //         uint256 liquidity1Long,
-    //         uint256 liquidity1Short
-    //     );
-
-    // /// @notice Withdraws liquidity.
-    // /// @param to Recipient.
-    // /// @param token0 First token.
-    // /// @param token1 Second token.
-    // /// @param liquidity0Long Amount of token0 long to burn.
-    // /// @param liquidity0Short Amount of token0 short to burn.
-    // /// @param liquidity1Long Amount of token1 long to burn.
-    // /// @param liquidity1Short Amount of token1 short to burn.
-    // /// @return pairId
-    // /// @return amount0
-    // /// @return amount1
-    // function withdrawLiquidity(
-    //     address to,
-    //     address token0,
-    //     address token1,
-    //     uint256 liquidity0Long,
-    //     uint256 liquidity0Short,
-    //     uint256 liquidity1Long,
-    //     uint256 liquidity1Short
-    // ) external returns (uint256 pairId, uint256 amount0, uint256 amount1);
-
-    // /// @notice Performs liquidity swap.
-    // /// @param to Recipient.
-    // /// @param token0 First token.
-    // /// @param token1 Second token.
-    // /// @param longToShort0 Whether to swap long to short for token0.
-    // /// @param liquidity0 Amount of token0 liquidity to swap.
-    // /// @param longToShort1 Whether to swap long to short for token1.
-    // /// @param liquidity1 Amount of token1 liquidity to swap.
-    // /// @return pairId The pair ID.
-    // /// @return liquidityOut0 Amount of token0 liquidity out.
-    // /// @return liquidityOut1 Amount of token1 liquidity out.
-    // function lpSwap(
-    //     address to,
-    //     address token0,
-    //     address token1,
-    //     bool longToShort0,
-    //     uint256 liquidity0,
-    //     bool longToShort1,
-    //     uint256 liquidity1
-    // ) external returns (uint256 pairId, uint256 liquidityOut0, uint256 liquidityOut1);
 
     // /// @notice Performs swap.
     // /// @param to Recipient.
