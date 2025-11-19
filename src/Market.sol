@@ -85,7 +85,6 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         // 0.check inputs
         address callback = msg.sender;
         uint256 length = tokens.length;
-        Validation.notThis(to);
         Validation.equalLengths(length, amounts.length);
         Validation.checkRedundantNative(tokens); // not allow duplicated native token input in the array
 
@@ -106,17 +105,17 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
 
     /// NOTE: fee-on-transfer tokens are NOT supported.
     /// NOTE: all amount0 and amount1 inputs here are permanently locked liquidity.
-    function create(address deployer, address token0, address token1, uint256 amount0, uint256 amount1, uint256 fee)
-        external
-        override
-        nonReentrant
-        onlyRouter
-        returns (uint64 poolId)
-    {
+    function createPool(
+        address payer,
+        address deployer,
+        address token0,
+        address token1,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 fee
+    ) external override nonReentrant onlyRouter returns (uint64 poolId) {
         // 0.check inputs
-        Validation.notThis(deployer);
         Validation.checkTokenOrder(token0, token1); // require pre-sorting of tokens
-
         Pair storage pair = pairs[token0][token1];
         require(pair.poolId == 0, pairAlreadyExists());
 
@@ -130,9 +129,7 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         // 1.ask for payment
         IPayment(msg.sender)
             .requestToken(
-                deployer,
-                PairLibrary.createTokenArrays(token0, token1),
-                PairLibrary.createAmountArrays(amount0, amount1)
+                payer, PairLibrary.createTokenArrays(token0, token1), PairLibrary.createAmountArrays(amount0, amount1)
             );
 
         // 2.mint liquidity and update storage
@@ -156,84 +153,27 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
     // NOTE: fee-on-transfer tokens are NOT supported.
     // NOTE: slippage tolerance is checked in the Router contract.
     // NOTE: if amount0 or amount1 is 0, liquidity output will become 0.
-    function deposit(address to, address token0, address token1, uint256 liquidityLong, uint256 liquidityShort)
-        external
-        override
-        nonReentrant
-        onlyRouter
-        returns (uint256 amount0, uint256 amount1)
-    {
+    function manageLiquidity(
+        address payer,
+        address recipient,
+        address token0,
+        address token1,
+        uint256 liquidityLong,
+        uint256 liquidityShort,
+        bool mintOrNot
+    ) external override nonReentrant onlyRouter returns (uint256 amount0, uint256 amount1) {
         // 0.check inputs
-        Validation.notThis(to);
-
         Pair storage pair = pairs[token0][token1];
         uint256 poolId = pair.poolId;
         require(poolId > 0, pairNotFound()); // revert if 1.pool does not exist, 2.token unsorted
+        uint256 shortTokenId = poolId * 2;
+        uint256 longTokenId = shortTokenId - 1;
 
         // 1.calculate amounts
         (uint256 supplyLong, uint256 supplyShort) = getLiquidity(token0, token1);
         (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short) =
             getReserve(token0, token1);
 
-        uint256 amount0Long = Math.fullMulDivUp(liquidityLong, reserve0Long, supplyLong);
-        uint256 amount0Short = Math.fullMulDivUp(liquidityShort, reserve0Short, supplyShort);
-        uint256 amount1Long = Math.fullMulDivUp(liquidityLong, reserve1Long, supplyLong);
-        uint256 amount1Short = Math.fullMulDivUp(liquidityShort, reserve1Short, supplyShort);
-
-        amount0 = amount0Long + amount0Short;
-        amount1 = amount1Long + amount1Short;
-
-        // 2.request a user payment
-        IPayment(msg.sender)
-            .requestToken(
-                to, PairLibrary.createTokenArrays(token0, token1), PairLibrary.createAmountArrays(amount0, amount1)
-            );
-
-        // 3.mint liquidity tokens
-        uint256 shortTokenId = poolId * 2;
-        uint256 longTokenId = shortTokenId - 1;
-
-        _mint(to, longTokenId, liquidityLong, 0);
-        _mint(to, shortTokenId, liquidityShort, 0);
-
-        // 4.update storages
-        _updatePair(
-            token0,
-            token1,
-            reserve0Long + amount0Long,
-            reserve0Short + amount0Short,
-            reserve1Long + amount1Long,
-            reserve1Short + amount1Short
-        );
-
-        tokenBalances[token0] += amount0;
-        tokenBalances[token1] += amount1;
-
-        // 5.emit Mint event
-        emit Mint(to, token0, token1, amount0, amount1, liquidityLong, liquidityShort);
-    }
-
-    function withdraw(
-        address from,
-        address to,
-        address token0,
-        address token1,
-        uint256 liquidityLong,
-        uint256 liquidityShort
-    ) external override nonReentrant onlyRouter returns (uint256 amount0, uint256 amount1) {
-        // 0.check inputs
-        Validation.notThis(from);
-        Validation.notThis(to);
-
-        Pair storage pair = pairs[token0][token1];
-        uint256 poolId = pair.poolId;
-        require(poolId > 0, pairNotFound()); // revert if 1. pool does not exist 2.token unsorted
-
-        (uint256 supplyLong, uint256 supplyShort) = getLiquidity(token0, token1);
-        (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short) =
-            getReserve(token0, token1);
-
-        // 1.calculate withdrawal amounts
         uint256 amount0Long = Math.fullMulDiv(liquidityLong, reserve0Long, supplyLong);
         uint256 amount0Short = Math.fullMulDiv(liquidityShort, reserve0Short, supplyShort);
         uint256 amount1Long = Math.fullMulDiv(liquidityLong, reserve1Long, supplyLong);
@@ -242,44 +182,64 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         amount0 = amount0Long + amount0Short;
         amount1 = amount1Long + amount1Short;
 
-        // 2.burn LP tokens
-        uint256 shortTokenId = poolId * 2;
-        uint256 longTokenId = shortTokenId - 1;
-        _burn(from, longTokenId, liquidityLong);
-        _burn(from, shortTokenId, liquidityShort);
+        if (mintOrNot) {
+            // if deposit liquidity
+            // request a user payment
+            IPayment(msg.sender)
+                .requestToken(
+                    payer,
+                    PairLibrary.createTokenArrays(token0, token1),
+                    PairLibrary.createAmountArrays(amount0, amount1)
+                );
 
-        // 3.update storages
-        _updatePair(
-            token0,
-            token1,
-            reserve0Long - amount0Long,
-            reserve0Short - amount0Short,
-            reserve1Long - amount1Long,
-            reserve1Short - amount1Short
-        );
+            // mint liquidity tokens
+            _mint(recipient, longTokenId, liquidityLong, 0);
+            _mint(recipient, shortTokenId, liquidityShort, 0);
 
-        tokenBalances[token0] -= amount0;
-        tokenBalances[token1] -= amount1;
+            reserve0Long += amount0Long;
+            reserve0Short += amount0Short;
+            reserve1Long += amount1Long;
+            reserve1Short += amount1Short;
 
-        // 4.transfer tokens to `to`
-        TransferHelper.safeTransfer(token0, to, amount0);
-        TransferHelper.safeTransfer(token1, to, amount1);
+            tokenBalances[token0] += amount0;
+            tokenBalances[token1] += amount1;
 
-        // 5.emit Withdraw event
-        emit Withdraw(from, to, token0, token1, amount0, amount1, liquidityLong, liquidityShort);
+            // emit Mint event
+            emit Mint(payer, recipient, token0, token1, amount0, amount1, liquidityLong, liquidityShort);
+        } else {
+            // if withdraw liquidity
+            // burn LP tokens
+            _burn(payer, longTokenId, liquidityLong);
+            _burn(payer, shortTokenId, liquidityShort);
+
+            reserve0Long -= amount0Long;
+            reserve0Short -= amount0Short;
+            reserve1Long -= amount1Long;
+            reserve1Short -= amount1Short;
+
+            tokenBalances[token0] -= amount0;
+            tokenBalances[token1] -= amount1;
+
+            // transfer tokens to `recipient`
+            TransferHelper.safeTransfer(token0, recipient, amount0);
+            TransferHelper.safeTransfer(token1, recipient, amount1);
+
+            // emit Withdraw event
+            emit Withdraw(payer, recipient, token0, token1, amount0, amount1, liquidityLong, liquidityShort);
+        }
+        // update storages
+        _updatePair(token0, token1, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
     }
 
-    function lpSwap(address from, address to, address token0, address token1, bool longToShort, uint256 liquidityIn)
-        external
-        override
-        nonReentrant
-        onlyRouter
-        returns (uint256 liquidityOut)
-    {
+    function swapLiquidity(
+        address payer,
+        address recipient,
+        address token0,
+        address token1,
+        bool longToShort,
+        uint256 liquidityIn
+    ) external override nonReentrant onlyRouter returns (uint256 liquidityOut) {
         // 0.check inputs
-        Validation.notThis(from);
-        Validation.notThis(to);
-
         uint256 poolId = pairs[token0][token1].poolId;
         require(poolId > 0, pairNotFound()); // revert if 1. pool does not exist 2.token unsorted
 
@@ -305,28 +265,26 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
             liquidityOut = PairLibrary.min(
                 Math.fullMulDiv(amount0, supplyLong, reserve0Long), Math.fullMulDiv(amount1, supplyLong, reserve1Long)
             );
-            reserve0Short -= amount0;
             reserve0Long += amount0;
-            reserve1Short -= amount1;
+            reserve0Short -= amount0;
             reserve1Long += amount1;
+            reserve1Short -= amount1;
         }
 
         // 2.burn input and mint output liquidity
         uint256 shortTokenId = poolId * 2;
         uint256 longTokenId = shortTokenId - 1;
 
-        _burn(from, longToShort ? longTokenId : shortTokenId, liquidityIn);
-        _mint(to, longToShort ? shortTokenId : longTokenId, liquidityOut, 0);
+        _burn(payer, longToShort ? longTokenId : shortTokenId, liquidityIn);
+        _mint(recipient, longToShort ? shortTokenId : longTokenId, liquidityOut, 0);
 
         // 3.update storages
         _updatePair(token0, token1, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
 
-        emit LiquiditySwap(from, to, token0, token1, longToShort, liquidityIn, liquidityOut);
+        emit LiquiditySwap(payer, recipient, token0, token1, longToShort, liquidityIn, liquidityOut);
     }
 
-    error invalidPath();
-
-    function swap(address to, address[] memory path, uint256 amount)
+    function swap(address payer, address recipient, address[] memory path, uint256 amount)
         external
         override
         nonReentrant
@@ -334,8 +292,6 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         returns (uint256 amountOut)
     {
         // 0.check inputs
-        Validation.notThis(to);
-        require(amount != 0);
         uint256 length = path.length;
         require(length >= 2, invalidPath());
 
@@ -343,8 +299,10 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         address tokenIn = path[0];
 
         for (uint256 i; i < length - 1; i++) {
+            address tokenA = path[i];
+            address tokenB = path[i + 1];
             (address token0, address token1, bool zeroForOne) =
-                path[i] < path[i + 1] ? (path[i], path[i + 1], true) : (path[i + 1], path[i], false);
+                tokenA < tokenB ? (tokenA, tokenB, true) : (tokenB, tokenA, false);
 
             uint256 poolId = pairs[token0][token1].poolId;
             require(poolId > 0, pairNotFound()); // revert if 1. pool does not exist 2.token unsorted
@@ -365,11 +323,20 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
                 //update reserves long and short
             }
 
+            amountOut -= feeAmountOut;
+            amountIn = amountOut; //chaining output as input for next swap
+
             //write to update pairs
+            _updatePair(token0, token1, reserve0Long, reserve0Short, reserve1Long, reserve1Short);
+
             //update tokenBalances and deplyerFee
         }
 
         //ask for payment
+        IPayment(msg.sender)
+            .requestToken(
+                to, PairLibrary.createTokenArrays(token0, token1), PairLibrary.createAmountArrays(amount0, amount1)
+            );
         //then transfer the token
         //emit Swap event
     }

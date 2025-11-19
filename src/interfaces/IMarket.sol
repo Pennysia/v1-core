@@ -49,7 +49,8 @@ interface IMarket {
     event Create(address indexed token0, address indexed token1, address indexed deployer);
 
     /// @notice Emitted when liquidity is minted.
-    /// @param to Recipient.
+    /// @param payer Payer address.
+    /// @param recipient Recipient address.
     /// @param token0 First token.
     /// @param token1 Second token.
     /// @param amount0 Token0 amount.
@@ -57,7 +58,8 @@ interface IMarket {
     /// @param longLiquidity Long liquidity amount.
     /// @param shortLiquidity Short liquidity amount.
     event Mint(
-        address indexed to,
+        address indexed payer,
+        address recipient,
         address indexed token0,
         address indexed token1,
         uint256 amount0,
@@ -66,9 +68,18 @@ interface IMarket {
         uint256 shortLiquidity
     );
 
+    /// @notice Emitted when liquidity is withdrawn.
+    /// @param payer Payer address
+    /// @param recipient Recipient address
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param amount0 Token0 amount.
+    /// @param amount1 Token1 amount.
+    /// @param longLiquidity Long liquidity amount.
+    /// @param shortLiquidity Short liquidity amount.
     event Withdraw(
-        address indexed from,
-        address to,
+        address indexed payer,
+        address recipient,
         address indexed token0,
         address indexed token1,
         uint256 amount0,
@@ -78,16 +89,16 @@ interface IMarket {
     );
 
     /// @notice Emitted when liquidity is swapped.
-    /// @param from Caller.
-    /// @param to Recipient.
+    /// @param payer Payer address.
+    /// @param recipient Recipient address.
     /// @param token0 First token.
     /// @param token1 Second token.
     /// @param longToShort Whether to swap long to short.
     /// @param liquidityIn Input liquidity amount.
     /// @param liquidityOut Output liquidity amount.
     event LiquiditySwap(
-        address indexed from,
-        address to,
+        address indexed payer,
+        address recipient,
         address indexed token0,
         address indexed token1,
         bool longToShort,
@@ -199,63 +210,68 @@ interface IMarket {
     function flashloan(address to, address[] calldata tokens, uint256[] calldata amounts) external;
 
     /// @notice Creates/adds liquidity.
-    /// @param to LP recipient.
+    /// @param payer Payer address.
+    /// @param deployer Deployer address.
     /// @param token0 First token.
     /// @param token1 Second token.
     /// @param amount0 Amount of token0 to add.
     /// @param amount1 Amount of token1 to add.
     /// @param fee Fee.
     /// @return poolId Pool ID.
-    function create(address to, address token0, address token1, uint256 amount0, uint256 amount1, uint256 fee)
-        external
-        returns (uint64 poolId);
+    function createPool(
+        address payer,
+        address deployer,
+        address token0,
+        address token1,
+        uint256 amount0,
+        uint256 amount1,
+        uint256 fee
+    ) external returns (uint64 poolId);
 
-    /// @notice Deposits liquidity.
-    /// @param to LP recipient.
+    /// @notice Manages liquidity.
+    /// @param payer LP sender address.
+    /// @param recipient LP recipient address.
     /// @param token0 First token.
     /// @param token1 Second token.
     /// @param liquidityLong Amount of long liquidity to deposit.
     /// @param liquidityShort Amount of short liquidity to deposit.
+    /// @param mintOrNot Whether to mint or burn liquidity.
     /// @return amount0 Amount of token0 required.
     /// @return amount1 Amount of token1 required.
-    function deposit(address to, address token0, address token1, uint256 liquidityLong, uint256 liquidityShort)
-        external
-        returns (uint256 amount0, uint256 amount1);
-
-    /// @notice Withdraws liquidity.
-    /// @param from LP sender.
-    /// @param to Recipient.
-    /// @param token0 First token.
-    /// @param token1 Second token.
-    /// @param liquidityLong Amount of long liquidity to withdraw.
-    /// @param liquidityShort Amount of short liquidity to withdraw.
-    /// @return amount0 Amount of token0 withdrawn.
-    /// @return amount1 Amount of token1 withdrawn.
-    function withdraw(
-        address from,
-        address to,
+    function manageLiquidity(
+        address payer,
+        address recipient,
         address token0,
         address token1,
         uint256 liquidityLong,
-        uint256 liquidityShort
+        uint256 liquidityShort,
+        bool mintOrNot
     ) external returns (uint256 amount0, uint256 amount1);
 
     /// @notice Swaps liquidity.
-    /// @param from LP sender.
-    /// @param to Recipient.
+    /// @param payer LP sender address.
+    /// @param recipeint Recipient address.
     /// @param token0 First token.
     /// @param token1 Second token.
     /// @param longToShort Whether to swap long to short or short to long.
     /// @param liquidityIn Amount of liquidity to swap.
     /// @return liquidityOut Amount of liquidity swapped.
-    function lpSwap(address from, address to, address token0, address token1, bool longToShort, uint256 liquidityIn)
-        external
-        returns (uint256 liquidityOut);
+    function swapLiquidity(
+        address payer,
+        address recipeint,
+        address token0,
+        address token1,
+        bool longToShort,
+        uint256 liquidityIn
+    ) external returns (uint256 liquidityOut);
 
-    // /// @notice Performs swap.
-    // /// @param to Recipient.
-    // /// @param path Swap path.
-    // /// @param amountIn Input amount.
-    // /// @return amountOut Output amount.
-    // function swap(address to, address[] calldata path, uint256 amountIn) external returns (uint256 amountOut);
+    /// @notice Swaps tokens.
+    /// @param payer Payer address.
+    /// @param recipient Recipient address.
+    /// @param path Swap path.
+    /// @param amount Amount of token to swap.
+    /// @return amountOut Amount of token swapped.
+    function swap(address payer, address recipient, address[] memory path, uint256 amount)
+        external
+        returns (uint256 amountOut);
 }
