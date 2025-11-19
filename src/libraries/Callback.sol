@@ -9,13 +9,13 @@ library Callback {
 
     function tokenCallback(
         address caller,
-        address to,
+        address payer,
         address[] memory tokens,
         uint256[] memory balancesBefore,
         uint256[] memory paybackAmounts
     ) internal {
         uint256 len = tokens.length;
-        IPayment(caller).requestToken(to, tokens, paybackAmounts); // user paybacks
+        IPayment(caller).requestToken(payer, tokens, paybackAmounts); // user paybacks
 
         // Verify payback amounts for each token
         for (uint256 i = 0; i < len; i++) {
