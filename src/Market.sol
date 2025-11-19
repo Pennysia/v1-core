@@ -324,6 +324,56 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         emit LiquiditySwap(from, to, token0, token1, longToShort, liquidityIn, liquidityOut);
     }
 
+    error invalidPath();
+
+    function swap(address to, address[] memory path, uint256 amount)
+        external
+        override
+        nonReentrant
+        onlyRouter
+        returns (uint256 amountOut)
+    {
+        // 0.check inputs
+        Validation.notThis(to);
+        require(amount != 0);
+        uint256 length = path.length;
+        require(length >= 2, invalidPath());
+
+        uint256 amountIn = amount;
+        address tokenIn = path[0];
+
+        for (uint256 i; i < length - 1; i++) {
+            (address token0, address token1, bool zeroForOne) =
+                path[i] < path[i + 1] ? (path[i], path[i + 1], true) : (path[i + 1], path[i], false);
+
+            uint256 poolId = pairs[token0][token1].poolId;
+            require(poolId > 0, pairNotFound()); // revert if 1. pool does not exist 2.token unsorted
+
+            (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short) =
+                getReserve(token0, token1);
+
+            uint256 reserveIn = zeroForOne ? (reserve0Long + reserve0Short) : (reserve1Long + reserve1Short);
+            uint256 reserveOut = zeroForOne ? (reserve1Long + reserve1Short) : (reserve0Long + reserve0Short);
+
+            uint256 newReserveIn = reserveIn + amountIn;
+            uint256 newReserveOut = Math.fullMulDiv(reserveOut, reserveIn, newReserveIn);
+            amountOut = reserveOut - newReserveOut;
+
+            if (zeroForOne) {
+                //update reserves long and short
+            } else {
+                //update reserves long and short
+            }
+
+            //write to update pairs
+            //update tokenBalances and deplyerFee
+        }
+
+        //ask for payment
+        //then transfer the token
+        //emit Swap event
+    }
+
     // function swap(address to, address[] memory path, uint256 amount)
     //     external
     //     override
