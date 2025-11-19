@@ -204,10 +204,11 @@ interface IMarket {
     function setDeployer(address _deployer, address token0, address token1) external;
 
     /// @notice Executes flash loan.
-    /// @param to Recipient.
+    /// @param payer Payer address.
+    /// @param recipient Recipient address.
     /// @param tokens Tokens.
     /// @param amounts Amounts.
-    function flashloan(address to, address[] calldata tokens, uint256[] calldata amounts) external;
+    function flashloan(address payer, address recipient, address[] calldata tokens, uint256[] calldata amounts) external;
 
     /// @notice Creates/adds liquidity.
     /// @param payer Payer address.

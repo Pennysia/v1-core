@@ -77,7 +77,7 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         emit DeployerChanged(token0, token1, _deployer);
     }
 
-    function flashloan(address to, address[] calldata tokens, uint256[] calldata amounts)
+    function flashloan(address payer, address receipient, address[] calldata tokens, uint256[] calldata amounts)
         external
         override
         nonReentrant
@@ -94,13 +94,13 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
 
         for (uint256 i; i < length; i++) {
             paybackAmounts[i] = Math.fullMulDivUp(amounts[i], 1001, 1000); // fixed 0.1% fee (10 bps)
-            TransferHelper.safeTransfer(tokens[i], to, amounts[i]);
+            TransferHelper.safeTransfer(tokens[i], receipient, amounts[i]);
             balancesBefore[i] = PairLibrary.getBalance(tokens[i]);
         }
 
         // 2.user performs actions and payback in the callback.
-        Callback.tokenCallback(callback, to, tokens, balancesBefore, paybackAmounts);
-        emit Flash(callback, to, tokens, amounts, paybackAmounts);
+        Callback.tokenCallback(callback, payer, tokens, balancesBefore, paybackAmounts);
+        emit Flash(payer, receipient, tokens, amounts, paybackAmounts);
     }
 
     /// NOTE: fee-on-transfer tokens are NOT supported.
