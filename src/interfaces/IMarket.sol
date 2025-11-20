@@ -26,6 +26,8 @@ interface IMarket {
         uint32 blockTimestampLast;
         uint64 poolId; // update on create a new pool
         address deployer; // update on create a new pool or change by exisiting deployer
+        uint128 deployerFee0;
+        uint128 deployerFee1;
     }
 
     /// @notice Emitted when deployer is updated.
@@ -33,6 +35,16 @@ interface IMarket {
     /// @param token1 Second token.
     /// @param deployer new deployer address.
     event DeployerChanged(address indexed token0, address indexed token1, address indexed deployer);
+
+    /// @notice Emitted when deployer fee is claimed.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param amount0 Token0 amount.
+    /// @param amount1 Token1 amount.
+    /// @param recipient Recipient address.
+    event DeployerFeeClaimed(
+        address indexed token0, address indexed token1, uint256 amount0, uint256 amount1, address indexed recipient
+    );
 
     /// @notice Emitted when a flash loan is executed.
     /// @param caller Caller.
@@ -135,6 +147,8 @@ interface IMarket {
     /// @return blockTimestampLast The block timestamp of the last update.
     /// @return poolId liquidity pool ID.
     /// @return deployer The pool deployer address
+    /// @return deployerFee0 The pool deployer fee for token0.
+    /// @return deployerFee1 The pool deployer fee for token1.
     function pairs(address token0, address token1)
         external
         view
@@ -146,7 +160,9 @@ interface IMarket {
             uint256 cbrtPriceCumulativeLast,
             uint32 blockTimestampLast,
             uint64 poolId,
-            address deployer
+            address deployer,
+            uint128 deployerFee0,
+            uint128 deployerFee1
         );
 
     /// @notice Gets total number of pairs.
@@ -198,10 +214,16 @@ interface IMarket {
     //--------------------------------- Read-Write Functions ---------------------------------
 
     /// @notice Sets deployer for a pair.
-    /// @param _deployer Deployer address.
     /// @param token0 First token.
     /// @param token1 Second token.
-    function setDeployer(address _deployer, address token0, address token1) external;
+    /// @param _deployer Deployer address.
+    function setDeployer(address token0, address token1, address _deployer) external;
+
+    /// @notice Claims deployer fee.
+    /// @param token0 First token.
+    /// @param token1 Second token.
+    /// @param recipient Recipient address.
+    function claimDeployerFee(address token0, address token1, address recipient) external;
 
     /// @notice Executes flash loan.
     /// @param payer Payer address.
