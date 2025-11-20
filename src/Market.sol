@@ -71,12 +71,6 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
 
     //--------------------------------- Read-Write Functions ---------------------------------
 
-    function setDeployer(address _deployer, address token0, address token1) external override {
-        require(pairs[token0][token1].deployer == msg.sender, forbidden());
-        pairs[token0][token1].deployer = _deployer;
-        emit DeployerChanged(token0, token1, _deployer);
-    }
-
     function flashloan(address payer, address receipient, address[] calldata tokens, uint256[] calldata amounts)
         external
         override
@@ -453,5 +447,24 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
             pair.cbrtPriceCumulativeLast += (cbrtPrice * timeElapsed);
             pair.blockTimestampLast = blockTimestamp;
         }
+    }
+
+    //--------------------------------- Deployer Functions ---------------------------------
+
+    function setDeployer(address token0, address token1, address _deployer) external override {
+        require(pairs[token0][token1].deployer == msg.sender, forbidden());
+        pairs[token0][token1].deployer = _deployer;
+        emit DeployerChanged(token0, token1, _deployer);
+    }
+
+    function claimDeployerFee(address token0, address token1, address recipient) external override {
+        require(pairs[token0][token1].deployer == msg.sender, forbidden());
+        uint256 fee0 = pairs[token0][token1].deployerFee0;
+        uint256 fee1 = pairs[token0][token1].deployerFee1;
+        pairs[token0][token1].deployerFee0 = 0;
+        pairs[token0][token1].deployerFee1 = 0;
+        TransferHelper.safeTransfer(token0, recipient, fee0);
+        TransferHelper.safeTransfer(token1, recipient, fee1);
+        emit DeployerFeeClaimed(token0, token1, fee0, fee1, recipient);
     }
 }
