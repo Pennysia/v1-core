@@ -118,21 +118,21 @@ interface IMarket {
         uint256 liquidityOut
     );
 
-    // /// @notice Emitted when a swap occurs.
-    // /// @param sender Caller.
-    // /// @param to Recipient.
-    // /// @param tokenIn Input token.
-    // /// @param tokenOut Output token.
-    // /// @param amountIn Input amount.
-    // /// @param amountOut Output amount.
-    // event Swap(
-    //     address indexed sender,
-    //     address indexed to,
-    //     address tokenIn,
-    //     address tokenOut,
-    //     uint256 amountIn,
-    //     uint256 amountOut
-    // );
+    /// @notice Emitted when a swap occurs.
+    /// @param payer Payer address.
+    /// @param recipient Recipient address.
+    /// @param tokenIn Input token.
+    /// @param tokenOut Output token.
+    /// @param amountIn Input amount.
+    /// @param amountOut Output amount.
+    event Swap(
+        address indexed payer,
+        address indexed recipient,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 amountOut
+    );
 
     //--------------------------------- Read-Only Functions ---------------------------------
 
@@ -288,13 +288,13 @@ interface IMarket {
         uint256 liquidityIn
     ) external returns (uint256 liquidityOut);
 
-    // /// @notice Swaps tokens.
-    // /// @param payer Payer address.
-    // /// @param recipient Recipient address.
-    // /// @param path Swap path.
-    // /// @param amount Amount of token to swap.
-    // /// @return amountOut Amount of token swapped.
-    // function swap(address payer, address recipient, address[] memory path, uint256 amount)
-    //     external
-    //     returns (uint256 amountOut);
+    /// @notice Swaps tokens.
+    /// @param payer Payer address.
+    /// @param recipient Recipient address.
+    /// @param path Swap path.
+    /// @param amount Amount of token to swap.
+    /// @return amountOut Amount of token swapped.
+    function swap(address payer, address recipient, address[] memory path, uint256 amount)
+        external
+        returns (uint256 amountOut);
 }
