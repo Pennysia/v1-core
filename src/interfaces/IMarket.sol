@@ -207,9 +207,9 @@ interface IMarket {
     /// @notice Gets LP token fee for a pair.
     /// @param token0 First token.
     /// @param token1 Second token.
-    /// @return fee0 Long token fee.
-    /// @return fee1 Short token fee.
-    function getFee(address token0, address token1) external view returns (uint256 fee0, uint256 fee1);
+    /// @return feeLong fee voted by long liquidity providers
+    /// @return feeShort fee voted by short liquidity providers
+    function getFee(address token0, address token1) external view returns (uint256 feeLong, uint256 feeShort);
 
     //--------------------------------- Read-Write Functions ---------------------------------
 
@@ -288,13 +288,13 @@ interface IMarket {
         uint256 liquidityIn
     ) external returns (uint256 liquidityOut);
 
-    /// @notice Swaps tokens.
-    /// @param payer Payer address.
-    /// @param recipient Recipient address.
-    /// @param path Swap path.
-    /// @param amount Amount of token to swap.
-    /// @return amountOut Amount of token swapped.
-    function swap(address payer, address recipient, address[] memory path, uint256 amount)
-        external
-        returns (uint256 amountOut);
+    // /// @notice Swaps tokens.
+    // /// @param payer Payer address.
+    // /// @param recipient Recipient address.
+    // /// @param path Swap path.
+    // /// @param amount Amount of token to swap.
+    // /// @return amountOut Amount of token swapped.
+    // function swap(address payer, address recipient, address[] memory path, uint256 amount)
+    //     external
+    //     returns (uint256 amountOut);
 }
