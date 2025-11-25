@@ -356,199 +356,29 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         uint256 length = path.length;
         require(length >= 2, invalidPath());
 
+        address tokenIn = path[0];
+        address tokenOut = path[length - 1];
         uint256 amountIn = amount;
 
-        // Track intermediate token balance changes locally
-        address intermediateToken;
-        uint256 intermediateTokenFeeDeduction;
-
         for (uint256 i; i < length - 1; i++) {
-            (amountOut, intermediateToken, intermediateTokenFeeDeduction) = _processSwapHop(
-                path[i], path[i + 1], amountIn, i, length, intermediateToken, intermediateTokenFeeDeduction
-            );
-
+            amountIn = _processSwapHop(path[i], path[i + 1], amountIn);
             // Chain output as input for next swap
-            amountIn = amountOut;
         }
+
+        amountOut = amountIn;
 
         // Request payment for the initial input amount
         address[] memory paymentTokens = new address[](1);
         uint256[] memory amounts = new uint256[](1);
-        paymentTokens[0] = path[0];
+        paymentTokens[0] = tokenIn;
         amounts[0] = amount;
-
         IPayment(msg.sender).requestToken(payer, paymentTokens, amounts);
 
-        // Transfer final output to recipient
-        TransferHelper.safeTransfer(path[length - 1], recipient, amountOut);
+        // transfer output token
+        TransferHelper.safeTransfer(tokenOut, recipient, amountOut);
 
         // Emit swap event
-        emit Swap(payer, recipient, path[0], path[length - 1], amount, amountOut);
-    }
-
-    function _processSwapHop(
-        address tokenA,
-        address tokenB,
-        uint256 amountIn,
-        uint256 hopIndex,
-        uint256 totalHops,
-        address intermediateToken,
-        uint256 intermediateTokenFeeDeduction
-    ) private returns (uint256 amountOut, address newIntermediateToken, uint256 newIntermediateTokenFeeDeduction) {
-        (address token0, address token1, bool zeroForOne) =
-            tokenA < tokenB ? (tokenA, tokenB, true) : (tokenB, tokenA, false);
-
-        uint256 poolId = pairs[token0][token1].poolId;
-        require(poolId > 0, pairNotFound()); // revert if 1. pool does not exist 2.token unsorted
-
-        (uint256 reserve0Long, uint256 reserve0Short, uint256 reserve1Long, uint256 reserve1Short) =
-            getReserve(token0, token1);
-
-        uint256 reserveIn = zeroForOne ? (reserve0Long + reserve0Short) : (reserve1Long + reserve1Short);
-
-        (uint256 fee0, uint256 fee1) = getFee(token0, token1);
-        uint256 shortTokenId = poolId * 2;
-        uint256 longTokenId = shortTokenId - 1;
-
-        uint256 deployerFee0;
-        uint256 deployerFee1;
-        uint256 protocolFee0;
-        uint256 protocolFee1;
-
-        // Pre-load deployer info to avoid duplicate storage reads
-        Pair storage pair = pairs[token0][token1];
-        address deployer = pair.deployer;
-        uint256 deployerLiquidityLong;
-        uint256 deployerLiquidityShort;
-        uint256 totalSupplyLong;
-        uint256 totalSupplyShort;
-
-        if (!feeSwitch) {
-            deployerLiquidityLong = balanceOf[deployer][longTokenId];
-            deployerLiquidityShort = balanceOf[deployer][shortTokenId];
-            totalSupplyLong = totalSupply[longTokenId];
-            totalSupplyShort = totalSupply[shortTokenId];
-        }
-
-        if (zeroForOne) {
-            // token0 -> token1 swap
-            uint256 feeAmount = ((amountIn * fee0) / 100000) >> 1; // Half fee on input
-            uint256 _amountIn = amountIn - feeAmount;
-
-            uint256 kLong = reserve0Long * reserve1Long;
-            uint256 kShort = reserve0Short * reserve1Short;
-
-            // Distribute input proportionally to maintain ratios
-            uint256 reserve0LongIn = Math.fullMulDiv(reserve0Long, _amountIn, reserveIn);
-            reserve0Long += reserve0LongIn;
-            uint256 newReserve1Long = kLong / reserve0Long;
-            uint256 amountOutLong = reserve1Long - newReserve1Long;
-            reserve1Long = newReserve1Long;
-
-            uint256 reserve0ShortIn = _amountIn - reserve0LongIn;
-            reserve0Short += reserve0ShortIn;
-            uint256 newReserve1Short = kShort / reserve0Short;
-            uint256 amountOutShort = reserve1Short - newReserve1Short;
-            reserve1Short = newReserve1Short;
-
-            amountOut = amountOutLong + amountOutShort;
-
-            // Apply output fee (other half)
-            uint256 outputFee = (amountOut * fee1) / 200000; // Half of fee1
-            amountOut -= outputFee;
-
-            // Handle swap fees directly (simpler than _distributeFees)
-            uint256 totalSwapFee0 = feeAmount;
-            uint256 totalSwapFee1 = outputFee;
-
-            // Calculate protocol fees (20% of total swap fees)
-            protocolFee0 = totalSwapFee0 / 5;
-            protocolFee1 = totalSwapFee1 / 5;
-
-            // Calculate deployer fees if feeSwitch is off (using pre-loaded data)
-            if (!feeSwitch) {
-                // Deployer gets proportional share of half the protocol fees
-                deployerFee0 = ((deployerLiquidityLong * protocolFee0 >> 1) / totalSupplyLong)
-                    + ((deployerLiquidityShort * protocolFee0 >> 1) / totalSupplyShort);
-                deployerFee1 = ((deployerLiquidityLong * protocolFee1 >> 1) / totalSupplyLong)
-                    + ((deployerLiquidityShort * protocolFee1 >> 1) / totalSupplyShort);
-            }
-        } else {
-            // token1 -> token0 swap
-            uint256 feeAmount = ((amountIn * fee1) / 100000) >> 1; // Half fee on input
-            uint256 _amountIn = amountIn - feeAmount;
-
-            uint256 kLong = reserve1Long * reserve0Long;
-            uint256 kShort = reserve1Short * reserve0Short;
-
-            // Distribute input proportionally to maintain ratios
-            uint256 reserve1LongIn = Math.fullMulDiv(reserve1Long, _amountIn, reserveIn);
-            reserve1Long += reserve1LongIn;
-            uint256 newReserve0Long = kLong / reserve1Long;
-            uint256 amountOutLong = reserve0Long - newReserve0Long;
-            reserve0Long = newReserve0Long;
-
-            uint256 reserve1ShortIn = _amountIn - reserve1LongIn;
-            reserve1Short += reserve1ShortIn;
-            uint256 newReserve0Short = kShort / reserve1Short;
-            uint256 amountOutShort = reserve0Short - newReserve0Short;
-            reserve0Short = newReserve0Short;
-
-            amountOut = amountOutLong + amountOutShort;
-
-            // Apply output fee (other half)
-            uint256 outputFee = (amountOut * fee0) / 200000; // Half of fee0
-            amountOut -= outputFee;
-
-            // Handle swap fees directly (simpler than _distributeFees)
-            uint256 totalSwapFee0 = outputFee;
-            uint256 totalSwapFee1 = feeAmount;
-
-            // Calculate protocol fees (20% of total swap fees)
-            protocolFee0 = totalSwapFee0 / 5;
-            protocolFee1 = totalSwapFee1 / 5;
-
-            // Calculate deployer fees if feeSwitch is off (using pre-loaded data)
-            if (!feeSwitch) {
-                // Deployer gets proportional share of half the protocol fees
-                deployerFee0 = ((deployerLiquidityLong * protocolFee0 >> 1) / totalSupplyLong)
-                    + ((deployerLiquidityShort * protocolFee0 >> 1) / totalSupplyShort);
-                deployerFee1 = ((deployerLiquidityLong * protocolFee1 >> 1) / totalSupplyLong)
-                    + ((deployerLiquidityShort * protocolFee1 >> 1) / totalSupplyShort);
-            }
-        }
-
-        // Handle token balance updates optimally
-        uint256 netProtocolFee0 = protocolFee0 - deployerFee0;
-        uint256 netProtocolFee1 = protocolFee1 - deployerFee1;
-
-        // Update first token immediately (only appears in first hop)
-        if (hopIndex == 0) {
-            tokenBalances[token0] -= netProtocolFee0;
-        }
-
-        // Handle intermediate token
-        if (hopIndex > 0 && token0 == intermediateToken) {
-            // Update accumulated intermediate token balance
-            tokenBalances[intermediateToken] -= (intermediateTokenFeeDeduction + netProtocolFee0);
-        }
-
-        // Set up for next iteration or final update
-        if (hopIndex == totalHops - 2) {
-            // Last hop - update final token immediately
-            tokenBalances[token1] -= netProtocolFee1;
-            newIntermediateToken = address(0);
-            newIntermediateTokenFeeDeduction = 0;
-        } else {
-            // Store intermediate token info for next iteration
-            newIntermediateToken = token1;
-            newIntermediateTokenFeeDeduction = netProtocolFee1;
-        }
-
-        // Update pair storage with deployer fees
-        _updatePair(
-            token0, token1, reserve0Long, reserve0Short, reserve1Long, reserve1Short, deployerFee0, deployerFee1
-        );
+        emit Swap(payer, recipient, tokenIn, tokenOut, amount, amountOut);
     }
 
     //--------------------------------- Private Functions ---------------------------------
@@ -669,5 +499,87 @@ contract Market is IMarket, Liquidity, ReentrancyGuard, OwnerAction {
         TransferHelper.safeTransfer(token1, recipient, fee1);
 
         emit DeployerFeeClaimed(token0, token1, fee0, fee1, recipient);
+    }
+
+    function _processSwapHop(address tokenA, address tokenB, uint256 amountIn) private returns (uint256 amountOut) {
+        (address token0, address token1, bool zeroForOne) =
+            tokenA < tokenB ? (tokenA, tokenB, true) : (tokenB, tokenA, false);
+
+        Pair storage pair = pairs[token0][token1];
+        uint256 poolId = pair.poolId;
+        require(poolId > 0, pairNotFound()); // revert if 1. pool does not exist 2.token unsorted
+
+        uint256 reserveInLong;
+        uint256 reserveInShort;
+        uint256 reserveOutLong;
+        uint256 reserveOutShort;
+        uint256 feeIn;
+
+        if (zeroForOne) {
+            (reserveInLong, reserveInShort, reserveOutLong, reserveOutShort) = getReserve(token0, token1);
+            (feeIn,) = getFee(token0, token1);
+        } else {
+            (reserveOutLong, reserveOutShort, reserveInLong, reserveInShort) = getReserve(token0, token1);
+            (, feeIn) = getFee(token0, token1);
+        }
+
+        // calculate fees
+        uint256 totalFeeIn = (amountIn * feeIn) / 100000;
+        uint256 protocolFee = totalFeeIn / 5;
+        uint256 inputFee = (totalFeeIn - protocolFee) >> 1; // Half fee on input
+        uint256 _amountIn = amountIn - inputFee;
+
+        // k of long side does not grow
+        uint256 reserveInLongAmount = (reserveInLong * _amountIn) / (reserveInLong + reserveInShort);
+        uint256 kLong = reserveInLong * reserveOutLong;
+        reserveInLong += reserveInLongAmount;
+        uint256 newReserveOutLong = kLong / reserveInLong;
+        amountOut = reserveOutLong - newReserveOutLong;
+        reserveOutLong = newReserveOutLong;
+
+        // k of short side grows
+        reserveInShort += _amountIn - reserveInLongAmount + inputFee; // earn input fee
+        uint256 newReserveOutShort = (reserveInShort * reserveOutLong) / reserveInLong; // use the ratio of long side to calculate short side
+        amountOut += reserveOutShort - newReserveOutShort; // already include output fee(another half)
+        reserveOutShort = newReserveOutShort;
+
+        uint256 deployerFeeIn;
+        if (!feeSwitch) {
+            uint256 lpTokenId = zeroForOne ? poolId * 2 : (poolId * 2) - 1;
+            uint256 totalLiquidity = totalSupply[lpTokenId];
+            uint256 deployerLiquidity = balanceOf[pair.deployer][lpTokenId];
+            deployerFeeIn = ((deployerLiquidity * protocolFee >> 1) / totalLiquidity);
+            protocolFee -= deployerFeeIn;
+        }
+
+        if (zeroForOne) {
+            _updatePair(
+                token0,
+                token1,
+                reserveInLong,
+                reserveInShort,
+                reserveOutLong,
+                reserveOutShort,
+                deployerFeeIn,
+                uint256(0)
+            );
+
+            tokenBalances[token0] += amountIn - protocolFee; // Receive input, deduct protocol fee
+            tokenBalances[token1] -= amountOut; // Send output
+        } else {
+            _updatePair(
+                token0,
+                token1,
+                reserveOutLong,
+                reserveOutShort,
+                reserveInLong,
+                reserveInShort,
+                uint256(0),
+                deployerFeeIn
+            );
+
+            tokenBalances[token1] += amountIn - protocolFee; // Receive input, deduct protocol fee
+            tokenBalances[token0] -= amountOut; // Send output
+        }
     }
 }
